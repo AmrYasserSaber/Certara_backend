@@ -1,0 +1,30 @@
+{
+    "name": "certara/irb-backend",
+    "description": "IRB Digital System - REST API backend (vanilla PHP core with Eloquent ORM).",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.1",
+        "vlucas/phpdotenv": "^5.6",
+        "firebase/php-jwt": "^6.10",
+        "illuminate/database": "^10.48",
+        "illuminate/events": "^10.48",
+        "illuminate/pagination": "^10.48",
+        "phpmailer/phpmailer": "^6.9",
+        "ramsey/uuid": "^4.7"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\Core\\":        "core/",
+            "App\\Enums\\":       "enums/",
+            "App\\Middleware\\":  "middleware/",
+            "App\\Controllers\\": "controllers/",
+            "App\\Models\\":      "models/",
+            "App\\Helpers\\":     "helpers/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    }
+}

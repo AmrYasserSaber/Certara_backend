@@ -1,0 +1,25 @@
+# Dependencies
+/backend/vendor/
+/node_modules/
+
+# Environment
+.env
+backend/.env
+
+# Uploads (keep structure, ignore content)
+backend/uploads/documents/*
+backend/uploads/certificates/*
+!backend/uploads/documents/.gitkeep
+!backend/uploads/certificates/.gitkeep
+
+# Logs
+*.log
+backend/logs/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Build
+dist/

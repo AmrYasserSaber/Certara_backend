@@ -1,0 +1,67 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Core;
+
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Events\Dispatcher;
+use Illuminate\Container\Container;
+
+
+final class Database
+{
+    private static ?Capsule $capsule = null;
+
+    public static function boot(array $config): void
+    {
+        if (self::$capsule !== null) {
+            return;
+        }
+
+        $capsule = new Capsule();
+        $capsule->addConnection($config);
+        $capsule->setEventDispatcher(new Dispatcher(new Container()));
+        $capsule->setAsGlobal();
+        $capsule->bootEloquent();
+
+        self::$capsule = $capsule;
+    }
+
+    public static function capsule(): Capsule
+    {
+        if (self::$capsule === null) {
+            throw new \RuntimeException('Database not booted. Call Database::boot($config) first.');
+        }
+        return self::$capsule;
+    }
+
+    public static function connection(): \Illuminate\Database\Connection
+    {
+        return self::capsule()->getConnection();
+    }
+
+    public static function fetchOne(string $sql, array $bindings = []): ?array
+    {
+        $row = self::connection()->selectOne($sql, $bindings);
+        return $row === null ? null : (array) $row;
+    }
+
+    public static function fetchAll(string $sql, array $bindings = []): array
+    {
+        return array_map(
+            static fn ($row): array => (array) $row,
+            self::connection()->select($sql, $bindings)
+        );
+    }
+
+    public static function execute(string $sql, array $bindings = []): int
+    {
+        return self::connection()->affectingStatement($sql, $bindings);
+    }
+
+    public static function transaction(callable $callback): mixed
+    {
+        return self::connection()->transaction($callback);
+    }
+}

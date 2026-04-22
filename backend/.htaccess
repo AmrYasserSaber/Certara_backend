@@ -1,0 +1,24 @@
+# Front-controller rewrites: route all non-file requests to index.php
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Block direct access to dotfiles
+    RewriteRule "(^|/)\." - [F]
+
+    # Skip real files and directories
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Send everything else to index.php
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Disable directory listing
+Options -Indexes
+
+# Prevent access to sensitive files
+<FilesMatch "^(\.env|composer\.(json|lock)|.*\.md)$">
+    Require all denied
+</FilesMatch>
