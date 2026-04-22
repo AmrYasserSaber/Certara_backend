@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Core\Response;
+use App\Helpers\InputValidator;
 
 abstract class Controller
 {
@@ -26,35 +27,13 @@ abstract class Controller
 
     protected function validate(Request $request, array $rules): array
     {
-        $data   = $request->all();
-        $errors = [];
+        $data = $request->all();
+        $result = InputValidator::validate($data, $rules);
 
-        foreach ($rules as $field => $rule) {
-            $required = str_contains($rule, 'required');
-            $value    = $data[$field] ?? null;
-
-            if ($required && ($value === null || $value === '')) {
-                $errors[$field] = "{$field} is required";
-                continue;
-            }
-
-            if ($value === null || $value === '') {
-                continue;
-            }
-
-            if (str_contains($rule, 'email') && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
-                $errors[$field] = "{$field} must be a valid email";
-            }
-
-            if (preg_match('/min:(\d+)/', $rule, $m) === 1 && strlen((string) $value) < (int) $m[1]) {
-                $errors[$field] = "{$field} must be at least {$m[1]} characters";
-            }
+        if ($result['errors'] !== []) {
+            $this->fail('Validation failed.', 422, 'validation_error', $result['errors']);
         }
 
-        if ($errors !== []) {
-            $this->fail('Validation failed.', 422, 'validation_error', $errors);
-        }
-
-        return $data;
+        return $result['data'];
     }
 }

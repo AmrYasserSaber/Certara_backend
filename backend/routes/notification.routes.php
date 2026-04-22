@@ -11,4 +11,3 @@ use App\Middleware\AuthMiddleware;
 $router->get('/api/notifications',              [NotificationController::class, 'index'],        [AuthMiddleware::class]);
 $router->put('/api/notifications/read-all',     [NotificationController::class, 'markAllRead'],  [AuthMiddleware::class]);
 $router->put('/api/notifications/{id}/read',    [NotificationController::class, 'markRead'],     [AuthMiddleware::class]);
-~`
