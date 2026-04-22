@@ -51,6 +51,11 @@ final class AuthMiddleware implements Middleware
             Response::error('Unauthenticated.', 401, 'unauthenticated');
         }
 
+        if ((string) ($user->status ?? '') !== 'active') {
+            CookieHelper::clearAuthCookies();
+            Response::error('Account is not active.', 403, 'account_inactive');
+        }
+
         AuthService::rotateRefreshToken($user, $jti);
 
         $request->setAttribute('user', $user);
@@ -72,6 +77,10 @@ final class AuthMiddleware implements Middleware
 
         /** @var User|null $user */
         $user = User::find($userId);
+        if ($user !== null && (string) ($user->status ?? '') !== 'active') {
+            CookieHelper::clearAuthCookies();
+            Response::error('Account is not active.', 403, 'account_inactive');
+        }
         return $user;
     }
 }

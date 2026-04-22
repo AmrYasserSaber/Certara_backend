@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Helpers\AuthService;
+use App\Helpers\EmailHelper;
 use App\Helpers\JWTHelper;
 use App\Models\User;
 
@@ -39,7 +40,7 @@ final class AuthController extends Controller
             'status'        => 'pending',
         ]);
 
-        AuthService::loginUser($user);
+        $this->sendRegistrationPendingActivationEmail($user);
 
         $this->created([
             'user' => AuthService::buildSafeUser($user),
@@ -119,5 +120,48 @@ final class AuthController extends Controller
             'ok' => true,
             'user_id' => (int) $user->id,
         ]);
+    }
+
+    private function sendRegistrationPendingActivationEmail(User $user): void
+    {
+        $to = (string) ($user->email ?? '');
+        if ($to === '') {
+            return;
+        }
+
+        $subject = 'Your account was created (activation pending)';
+        $name = htmlspecialchars((string) ($user->name ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+        $body = <<<HTML
+<!doctype html>
+<html lang="en">
+  <body style="font-family: Tahoma, Arial, sans-serif; background:#f6f6f6; padding:20px;">
+    <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;padding:24px;">
+      <h2 style="color:#0b3d91;margin:0 0 16px;">Welcome{$this->renderNameSuffix($name)}</h2>
+      <p style="line-height:1.7;color:#333;margin:0 0 12px;">
+        Your student account has been created successfully.
+      </p>
+      <p style="line-height:1.7;color:#333;margin:0 0 12px;">
+        Your account still needs to be activated by the administration before you can sign in.
+      </p>
+      <p style="line-height:1.7;color:#333;margin:0 0 12px;">
+        You will receive another email once your account is activated.
+      </p>
+      <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+      <p style="color:#888;font-size:12px;margin:0;">IRB Digital System — automated email.</p>
+    </div>
+  </body>
+</html>
+HTML;
+
+        EmailHelper::send($to, $subject, $body, true);
+    }
+
+    private function renderNameSuffix(string $escapedName): string
+    {
+        if ($escapedName === '') {
+            return '';
+        }
+        return ', ' . $escapedName;
     }
 }
