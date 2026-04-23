@@ -19,6 +19,14 @@ final class Database
             return;
         }
 
+        Logger::info('Database booting', [
+            'driver' => $config['driver'] ?? null,
+            'host' => $config['host'] ?? null,
+            'port' => $config['port'] ?? null,
+            'database' => $config['database'] ?? null,
+            'username' => $config['username'] ?? null,
+        ]);
+
         $capsule = new Capsule();
         $capsule->addConnection($config);
         $capsule->setEventDispatcher(new Dispatcher(new Container()));

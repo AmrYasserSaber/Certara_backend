@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Core\Logger;
 use App\Helpers\AuthService;
 use App\Helpers\EmailHelper;
 use App\Helpers\JWTHelper;
@@ -14,6 +15,11 @@ final class AuthController extends Controller
 {
     public function register(Request $request): never
     {
+        Logger::info('Auth register attempt', [
+            'path' => $request->path(),
+            'method' => $request->method(),
+        ]);
+
         $data = $this->validate($request, [
             'name'       => 'required|string|trim|min:2|max:150',
             'email'      => 'required|string|trim|email|max:190',
@@ -26,6 +32,7 @@ final class AuthController extends Controller
         $email = strtolower((string) $data['email']);
 
         if (User::query()->where('email', $email)->exists()) {
+            Logger::warning('Register blocked: email exists', ['email' => $email]);
             $this->fail('Email is already registered.', 409, 'email_taken');
         }
 
@@ -42,6 +49,12 @@ final class AuthController extends Controller
 
         $this->sendRegistrationPendingActivationEmail($user);
 
+        Logger::info('Auth register success', [
+            'user_id' => (int) $user->id,
+            'email' => (string) $user->email,
+            'status' => (string) $user->status,
+        ]);
+
         $this->created([
             'user' => AuthService::buildSafeUser($user),
         ]);
@@ -49,6 +62,11 @@ final class AuthController extends Controller
 
     public function login(Request $request): never
     {
+        Logger::info('Auth login attempt', [
+            'path' => $request->path(),
+            'method' => $request->method(),
+        ]);
+
         $data = $this->validate($request, [
             'email'    => 'required|string|trim|email|max:190',
             'password' => 'required|string|min:8|max:255',
@@ -58,18 +76,34 @@ final class AuthController extends Controller
 
         $user = User::query()->where('email', $email)->first();
         if ($user === null) {
+            Logger::warning('Login failed: user not found', ['email' => $email]);
             $this->fail('Invalid credentials.', 401, 'invalid_credentials');
         }
 
         if ((string) ($user->status ?? '') !== 'active') {
+            Logger::warning('Login blocked: inactive account', [
+                'user_id' => (int) $user->id,
+                'email' => (string) $user->email,
+                'status' => (string) $user->status,
+            ]);
             $this->fail('Account is not active.', 403, 'account_inactive');
         }
 
         if (!AuthService::verifyPassword((string) $data['password'], (string) $user->password_hash)) {
+            Logger::warning('Login failed: password mismatch', [
+                'user_id' => (int) $user->id,
+                'email' => (string) $user->email,
+            ]);
             $this->fail('Invalid credentials.', 401, 'invalid_credentials');
         }
 
         AuthService::loginUser($user);
+
+        Logger::info('Auth login success', [
+            'user_id' => (int) $user->id,
+            'email' => (string) $user->email,
+            'role' => (string) $user->role,
+        ]);
 
         $this->ok([
             'user' => AuthService::buildSafeUser($user),
@@ -78,6 +112,11 @@ final class AuthController extends Controller
 
     public function logout(Request $request): never
     {
+        Logger::info('Auth logout attempt', [
+            'path' => $request->path(),
+            'method' => $request->method(),
+        ]);
+
         $refreshJwt = $_COOKIE[\App\Helpers\CookieHelper::COOKIE_REFRESH] ?? null;
 
         $refreshJti = null;
@@ -95,6 +134,11 @@ final class AuthController extends Controller
         }
 
         AuthService::logoutUser($refreshJti, $userId);
+
+        Logger::info('Auth logout success', [
+            'user_id' => $userId,
+            'had_refresh_jti' => $refreshJti !== null,
+        ]);
 
         $this->ok(['ok' => true]);
     }

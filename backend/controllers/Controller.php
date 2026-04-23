@@ -6,6 +6,7 @@ namespace App\Controllers;
 
 use App\Core\Request;
 use App\Core\Response;
+use App\Core\Logger;
 use App\Helpers\InputValidator;
 
 abstract class Controller
@@ -31,6 +32,11 @@ abstract class Controller
         $result = InputValidator::validate($data, $rules);
 
         if ($result['errors'] !== []) {
+            Logger::warning('Validation failed', [
+                'path' => $request->path(),
+                'method' => $request->method(),
+                'errors' => $result['errors'],
+            ]);
             $this->fail('Validation failed.', 422, 'validation_error', $result['errors']);
         }
 

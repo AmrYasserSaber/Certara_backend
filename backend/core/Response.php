@@ -22,6 +22,14 @@ final class Response
         string $code = 'bad_request',
         ?array $details = null
     ): never {
+        Logger::warning('API error response', [
+            'status' => $status,
+            'code' => $code,
+            'message' => $message,
+            'path' => $_SERVER['REQUEST_URI'] ?? null,
+            'method' => $_SERVER['REQUEST_METHOD'] ?? null,
+        ]);
+
         self::send([
             'success' => false,
             'data'    => null,

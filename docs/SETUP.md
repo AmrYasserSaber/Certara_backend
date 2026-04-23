@@ -84,6 +84,11 @@ Expected response:
 }
 ```
 
+Logs are written to `backend/logs/app.log` (request + error logs), plus
+`backend/logs/mail.log` and `backend/logs/sms.log` when MAIL/SMS drivers are
+set to `log`. With `LOG_TO_STDERR=true`, logs are mirrored to the `php -S`
+terminal output as well.
+
 ## 6. Apache / XAMPP deployment (optional)
 
 - Point the DocumentRoot at `backend/`.

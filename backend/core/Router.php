@@ -73,6 +73,12 @@ final class Router
             'handler'    => $handler,
             'middleware' => $middleware,
         ];
+
+        Logger::debug('Route registered', [
+            'method' => $method,
+            'pattern' => $pattern,
+            'middleware_count' => count($middleware),
+        ]);
     }
 
     public function dispatch(Request $request): never
@@ -91,6 +97,13 @@ final class Router
                     $params[$name] = $matches[$name] ?? '';
                 }
                 $request->setRouteParams($params);
+
+                Logger::info('Route matched', [
+                    'method' => $method,
+                    'path' => $path,
+                    'pattern' => $route['pattern'],
+                    'params' => $params,
+                ]);
 
                 foreach ($this->globalMiddleware as $m) {
                     $request = $this->runMiddleware($m, $request);
@@ -127,8 +140,19 @@ final class Router
         $instance = is_string($middleware) ? new $middleware() : $middleware;
 
         if (!$instance instanceof Middleware) {
+            Logger::error('Invalid middleware configuration', [
+                'middleware_type' => is_object($instance) ? get_class($instance) : gettype($instance),
+                'path' => $request->path(),
+                'method' => $request->method(),
+            ]);
             Response::error('Invalid middleware configuration.', 500, 'server_error');
         }
+
+        Logger::debug('Running middleware', [
+            'middleware' => get_class($instance),
+            'path' => $request->path(),
+            'method' => $request->method(),
+        ]);
 
         return $instance->handle($request);
     }
@@ -142,6 +166,10 @@ final class Router
         } elseif (is_callable($handler)) {
             $result = $handler($request);
         } else {
+            Logger::error('Invalid route handler', [
+                'path' => $request->path(),
+                'method' => $request->method(),
+            ]);
             Response::error('Invalid route handler.', 500, 'server_error');
         }
 

@@ -44,7 +44,16 @@ final class EmailHelper
             $mail->Subject = $subject;
             $mail->Body    = $body;
 
-            return $mail->send();
+            $sent = $mail->send();
+            self::logToFile('email_sent', [
+                'to'      => $to,
+                'subject' => $subject,
+                'driver'  => 'smtp',
+                'host'    => (string) env('MAIL_HOST', 'localhost'),
+                'port'    => (int) env('MAIL_PORT', 587),
+                'secure'  => (string) env('MAIL_ENCRYPTION', 'tls'),
+            ]);
+            return $sent;
         } catch (\Throwable $e) {
             self::logToFile('email_error', [
                 'to'      => $to,
