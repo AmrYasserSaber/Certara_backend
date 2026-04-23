@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Core\Database;
+use App\Core\Logger;
 use App\Core\Request;
 
 final class HealthController extends Controller
@@ -19,6 +20,7 @@ final class HealthController extends Controller
         } catch (\Throwable $e) {
             $dbOk    = false;
             $dbError = $e->getMessage();
+            Logger::warning('Health check DB ping failed', ['error' => $dbError]);
         }
 
         $this->ok([

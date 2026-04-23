@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Helpers;
 
+use App\Core\Logger;
 use App\Models\Notification;
 use App\Models\User;
 
@@ -21,6 +22,12 @@ final class NotificationService
         string $message,
         ?int $researchId = null
     ): Notification {
+        Logger::info('NotificationService notify called', [
+            'user_id' => $userId,
+            'type' => $type,
+            'research_id' => $researchId,
+        ]);
+
         $notification = Notification::create([
             'user_id'     => $userId,
             'type'        => $type,
@@ -33,19 +40,30 @@ final class NotificationService
 
         $user = User::find($userId);
         if ($user === null) {
+            Logger::warning('NotificationService user not found', ['user_id' => $userId]);
             return $notification;
         }
 
         if (!empty($user->email)) {
-            EmailHelper::send(
+            $emailSent = EmailHelper::send(
                 (string) $user->email,
                 $title,
                 self::buildEmailBody($title, $message)
             );
+            Logger::info('NotificationService email dispatch result', [
+                'user_id' => $userId,
+                'to' => (string) $user->email,
+                'sent' => $emailSent,
+            ]);
         }
 
         if (!empty($user->phone)) {
-            SMSHelper::send((string) $user->phone, $title . ' - ' . $message);
+            $smsSent = SMSHelper::send((string) $user->phone, $title . ' - ' . $message);
+            Logger::info('NotificationService sms dispatch result', [
+                'user_id' => $userId,
+                'phone' => (string) $user->phone,
+                'sent' => $smsSent,
+            ]);
         }
 
         return $notification;

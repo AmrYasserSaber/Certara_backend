@@ -16,8 +16,6 @@ CREATE TABLE `users` (
     `role`                 ENUM('student','admin','sample_size_officer','reviewer','manager')
                            NOT NULL DEFAULT 'student',
     `status`               ENUM('pending','active','rejected') NOT NULL DEFAULT 'pending',
-    `id_photo_front_path`  VARCHAR(255)    NULL,
-    `id_photo_back_path`   VARCHAR(255)    NULL,
     `created_at`           TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`           TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
                                              ON UPDATE CURRENT_TIMESTAMP,
@@ -25,6 +23,47 @@ CREATE TABLE `users` (
     UNIQUE KEY `uq_users_email`       (`email`),
     UNIQUE KEY `uq_users_national_id` (`national_id`),
     KEY `idx_users_role_status`       (`role`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- user_avatars -------------------------------------------------------------
+DROP TABLE IF EXISTS `user_avatars`;
+CREATE TABLE `user_avatars` (
+    `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id`       BIGINT UNSIGNED NOT NULL,
+    `file_id`       VARCHAR(64)     NULL,
+    `file_path`     VARCHAR(255)    NOT NULL,
+    `file_url`      VARCHAR(500)    NULL,
+    `original_name` VARCHAR(255)    NOT NULL,
+    `size_bytes`    INT UNSIGNED    NULL,
+    `mime_type`     VARCHAR(100)    NULL,
+    `is_active`     TINYINT(1)      NOT NULL DEFAULT 1,
+    `created_at`    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_user_avatars_user_active` (`user_id`, `is_active`),
+    CONSTRAINT `fk_user_avatars_user`
+        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- user_identity_photos -----------------------------------------------------
+DROP TABLE IF EXISTS `user_identity_photos`;
+CREATE TABLE `user_identity_photos` (
+    `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id`       BIGINT UNSIGNED NOT NULL,
+    `type`          ENUM('front','back') NOT NULL,
+    `file_id`       VARCHAR(64)     NULL,
+    `file_path`     VARCHAR(255)    NOT NULL,
+    `file_url`      VARCHAR(500)    NULL,
+    `original_name` VARCHAR(255)    NOT NULL,
+    `size_bytes`    INT UNSIGNED    NULL,
+    `mime_type`     VARCHAR(100)    NULL,
+    `is_active`     TINYINT(1)      NOT NULL DEFAULT 1,
+    `created_at`    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                      ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_user_identity_photos_user_type_active` (`user_id`, `type`, `is_active`),
+    CONSTRAINT `fk_user_identity_photos_user`
+        FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- research -----------------------------------------------------------------

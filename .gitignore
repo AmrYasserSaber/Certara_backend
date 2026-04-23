@@ -23,3 +23,5 @@ backend/logs/
 
 # Build
 dist/
+
+backend/composer.lock
