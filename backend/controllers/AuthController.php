@@ -27,7 +27,10 @@ final class AuthController extends Controller
             'phone'      => 'nullable|string|trim|phone_eg',
             'department' => 'nullable|string|trim|min:2|max:150',
             'faculty'    => 'nullable|string|trim|min:2|max:150',
+            'specialization' => 'nullable|string|trim|min:2|max:150',
         ]);
+
+        Logger::info('Data', ['data' => $data]);
 
         $email = strtolower((string) $data['email']);
 
@@ -43,6 +46,7 @@ final class AuthController extends Controller
             'phone'         => $data['phone'] ?? null,
             'department'    => $data['department'] ?? null,
             'faculty'       => $data['faculty'] ?? null,
+            'specialization' => $data['specialization'] ?? null,
             'role'          => 'student',
             'status'        => 'pending',
         ]);
