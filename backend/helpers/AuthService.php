@@ -40,8 +40,11 @@ final class AuthService
 
     public static function logoutUser(?string $refreshJti, ?int $userId): void
     {
-        if ($refreshJti !== null && $refreshJti !== '' && $userId !== null && $userId > 0) {
-            self::revokeRefreshToken($refreshJti, $userId);
+        if ($userId !== null && $userId > 0) {
+            RefreshToken::query()
+                ->where('user_id', $userId)
+                ->whereNull('revoked_at')
+                ->update(['revoked_at' => date('Y-m-d H:i:s')]);
         }
 
         CookieHelper::clearAuthCookies();
