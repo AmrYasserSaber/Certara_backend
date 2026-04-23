@@ -14,9 +14,23 @@ final class CsrfMiddleware implements Middleware
     /** @var list<string> */
     private const STATE_CHANGING_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
+    private const CSRF_SKIP_PATHS = [
+        '/api/health',
+        '/api/auth/login',
+        '/api/auth/register',
+    ];
+
     public function handle(Request $request): Request
     {
+        if ($request->method() === 'OPTIONS') {
+            return $request;
+        }
+
         if (!in_array($request->method(), self::STATE_CHANGING_METHODS, true)) {
+            return $request;
+        }
+
+        if (in_array($request->path(), self::CSRF_SKIP_PATHS, true)) {
             return $request;
         }
 

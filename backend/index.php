@@ -8,6 +8,7 @@ use App\Core\Logger;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Router;
+use App\Middleware\CsrfMiddleware;
 
 require __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/config/env.php';
@@ -65,6 +66,7 @@ Logger::info('Incoming request', [
 ]);
 
 $router = new Router();
+$router->useGlobal([CsrfMiddleware::class]);
 
 $routeFiles = [
     __DIR__ . '/routes/health.routes.php',

@@ -35,6 +35,7 @@ Open `backend/.env` and set at minimum:
 - `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
 - `JWT_SECRET` — a long random string (use `openssl rand -hex 32`)
 - `CORS_ALLOWED_ORIGINS` — the Vue dev URL (e.g. `http://localhost:5173`)
+- `COOKIE_SAMESITE=None` and `COOKIE_SECURE=true` — required when the frontend runs on a different origin and you rely on cookie-based auth (this requires HTTPS)
 
 ## 4. Create the database and import the schema + seeds
 
@@ -47,14 +48,14 @@ mysql -u root -p irb_system < database/seeds/test_users.sql
 
 Test accounts (all with password `password`):
 
-| Role                  | Email                  |
-| --------------------- | ---------------------- |
-| Admin                 | `admin@irb.local`      |
-| Manager               | `manager@irb.local`    |
-| Sample Size Officer   | `sample@irb.local`     |
-| Reviewer              | `reviewer@irb.local`   |
-| Student (active)      | `student@irb.local`    |
-| Student (pending)     | `pending@irb.local`    |
+| Role                | Email                |
+| ------------------- | -------------------- |
+| Admin               | `admin@irb.local`    |
+| Manager             | `manager@irb.local`  |
+| Sample Size Officer | `sample@irb.local`   |
+| Reviewer            | `reviewer@irb.local` |
+| Student (active)    | `student@irb.local`  |
+| Student (pending)   | `pending@irb.local`  |
 
 > Replace every password before deploying to a shared environment.
 
@@ -77,10 +78,10 @@ Expected response:
 
 ```json
 {
-  "success": true,
-  "data": { "service": "IRB Digital System", "database": { "ok": true } },
-  "error": null,
-  "meta": null
+    "success": true,
+    "data": { "service": "IRB Digital System", "database": { "ok": true } },
+    "error": null,
+    "meta": null
 }
 ```
 
@@ -88,6 +89,32 @@ Logs are written to `backend/logs/app.log` (request + error logs), plus
 `backend/logs/mail.log` and `backend/logs/sms.log` when MAIL/SMS drivers are
 set to `log`. With `LOG_TO_STDERR=true`, logs are mirrored to the `php -S`
 terminal output as well.
+
+## 5.1 CSRF verification (cookie auth)
+
+The API uses cookie-based auth and enforces CSRF for any state-changing request
+(`POST`, `PUT`, `PATCH`, `DELETE`). Your frontend must read `IRB_CSRF_TOKEN`
+cookie and send it as `X-CSRF-Token` on every write request.
+
+Quick checks (replace `baseUrl` as needed):
+
+```bash
+# 1) Login and capture cookies (includes IRB_CSRF_TOKEN)
+curl -i -c cookies.txt -H "Content-Type: application/json" \
+  -d '{"email":"student@irb.local","password":"password"}' \
+  http://localhost:8000/api/auth/login
+
+# 2) Extract CSRF token value from the cookie jar
+csrfToken="$(awk '/IRB_CSRF_TOKEN/{print $7}' cookies.txt)"
+echo "$csrfToken"
+
+# 3) A write request without X-CSRF-Token should fail with 403
+curl -i -b cookies.txt -X PUT http://localhost:8000/api/notifications/read-all
+
+# 4) The same request with the header should succeed (2xx)
+curl -i -b cookies.txt -H "X-CSRF-Token: ${csrfToken}" \
+  -X PUT http://localhost:8000/api/notifications/read-all
+```
 
 ## 6. Apache / XAMPP deployment (optional)
 
