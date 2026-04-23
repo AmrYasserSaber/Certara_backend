@@ -30,8 +30,6 @@ final class AuthController extends Controller
             'specialization' => 'nullable|string|trim|min:2|max:150',
         ]);
 
-        Logger::info('Data', ['data' => $data]);
-
         $email = strtolower((string) $data['email']);
 
         if (User::query()->where('email', $email)->exists()) {
