@@ -17,7 +17,7 @@ final class CookieHelper
 
     public static function setRefreshTokenCookie(string $token, int $expiresAt): void
     {
-        self::setCookie(self::COOKIE_REFRESH, $token, $expiresAt, '/api/auth', true);
+        self::setCookie(self::COOKIE_REFRESH, $token, $expiresAt, '/', true);
     }
 
     public static function setCsrfCookie(string $token, int $expiresAt): void
@@ -28,7 +28,7 @@ final class CookieHelper
     public static function clearAuthCookies(): void
     {
         self::clearCookie(self::COOKIE_ACCESS, '/');
-        self::clearCookie(self::COOKIE_REFRESH, '/api/auth');
+        self::clearCookie(self::COOKIE_REFRESH, '/');
         self::clearCookie(self::COOKIE_CSRF, '/');
     }
 

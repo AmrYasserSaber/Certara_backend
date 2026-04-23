@@ -72,6 +72,7 @@ $routeFiles = [
     __DIR__ . '/routes/health.routes.php',
     __DIR__ . '/routes/auth.routes.php',
     __DIR__ . '/routes/notification.routes.php',
+    __DIR__ . '/routes/user-files.routes.php',
     // __DIR__ . '/routes/research.routes.php',   // DEV 2
     // __DIR__ . '/routes/review.routes.php',     // DEV 3
     // __DIR__ . '/routes/admin.routes.php',      // DEV 4

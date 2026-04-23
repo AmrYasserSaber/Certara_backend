@@ -21,8 +21,6 @@ final class User extends Model
         'specialization',
         'role',
         'status',
-        'id_photo_front_path',
-        'id_photo_back_path',
     ];
 
     protected $hidden = [
