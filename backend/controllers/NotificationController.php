@@ -22,20 +22,14 @@ final class NotificationController extends Controller
             'limit' => $limit,
         ]);
 
-        $query = Notification::where('user_id', $user->id)->orderByDesc('created_at');
-
-        $total = (clone $query)->count();
-        $items = $query->forPage($page, $limit)->get()->toArray();
+        $result = Notification::getForUser((int) $user->id, $page, $limit);
+        $items = $result['items'];
+        $meta = $result['meta'];
 
         $this->ok([
             'items'        => $items,
             'unread_count' => Notification::unreadCount((int) $user->id),
-        ], [
-            'page'  => $page,
-            'limit' => $limit,
-            'total' => $total,
-            'pages' => (int) ceil($total / $limit),
-        ]);
+        ], $meta);
     }
 
     public function markRead(Request $request): never

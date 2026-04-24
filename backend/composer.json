@@ -25,6 +25,18 @@
             "App\\Services\\": "services/"
         }
     },
+    "scripts": {
+        "migrations:status": "php scripts/migrations.php status",
+        "migrations:up": "php scripts/migrations.php up",
+        "serve": [
+            "@migrations:status",
+            "php -S localhost:8000 index.php"
+        ],
+        "serve:with-migrations": [
+            "@migrations:up",
+            "php -S localhost:8000 index.php"
+        ]
+    },
     "config": {
         "sort-packages": true,
         "optimize-autoloader": true

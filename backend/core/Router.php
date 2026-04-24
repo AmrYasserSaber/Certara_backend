@@ -105,13 +105,8 @@ final class Router
                     'params' => $params,
                 ]);
 
-                foreach ($this->globalMiddleware as $m) {
-                    $request = $this->runMiddleware($m, $request);
-                }
-
-                foreach ($route['middleware'] as $m) {
-                    $request = $this->runMiddleware($m, $request);
-                }
+                $request = MiddlewareRunner::run($this->globalMiddleware, $request);
+                $request = MiddlewareRunner::run($route['middleware'], $request);
 
                 $this->invokeHandler($route['handler'], $request);
             }
@@ -133,28 +128,6 @@ final class Router
         );
 
         return ['#^' . $regex . '$#', $params];
-    }
-
-    private function runMiddleware(mixed $middleware, Request $request): Request
-    {
-        $instance = is_string($middleware) ? new $middleware() : $middleware;
-
-        if (!$instance instanceof Middleware) {
-            Logger::error('Invalid middleware configuration', [
-                'middleware_type' => is_object($instance) ? get_class($instance) : gettype($instance),
-                'path' => $request->path(),
-                'method' => $request->method(),
-            ]);
-            Response::error('Invalid middleware configuration.', 500, 'server_error');
-        }
-
-        Logger::debug('Running middleware', [
-            'middleware' => get_class($instance),
-            'path' => $request->path(),
-            'method' => $request->method(),
-        ]);
-
-        return $instance->handle($request);
     }
 
     private function invokeHandler(mixed $handler, Request $request): never

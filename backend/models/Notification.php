@@ -52,4 +52,24 @@ class Notification extends Model
     {
         return self::where('user_id', $userId)->where('is_read', false)->count();
     }
+
+    public static function getForUser(int $userId, int $page = 1, int $limit = 20): array
+    {
+        $page = max(1, $page);
+        $limit = min(50, max(1, $limit));
+
+        $query = self::where('user_id', $userId)->orderByDesc('created_at');
+        $total = (clone $query)->count();
+        $items = $query->forPage($page, $limit)->get()->toArray();
+
+        return [
+            'items' => $items,
+            'meta' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'pages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
 }

@@ -49,6 +49,11 @@ final class Database
         return self::capsule()->getConnection();
     }
 
+    public static function query(string $sql, array $bindings = []): array
+    {
+        return self::connection()->select($sql, $bindings);
+    }
+
     public static function fetchOne(string $sql, array $bindings = []): ?array
     {
         $row = self::connection()->selectOne($sql, $bindings);

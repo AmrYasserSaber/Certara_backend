@@ -46,6 +46,13 @@ mysql -u root -p irb_system < database/seeds/roles.sql
 mysql -u root -p irb_system < database/seeds/test_users.sql
 ```
 
+When pulling new schema changes later, run from `backend/`:
+
+```bash
+composer migrations:status   # exits 0 when fully up to date, 1 when pending files exist
+composer migrations:up       # applies pending SQL files from database/migrations
+```
+
 Test accounts (all with password `password`):
 
 | Role                | Email                |
@@ -66,6 +73,14 @@ Using PHP's built-in web server (recommended for local dev):
 ```bash
 cd backend
 php -S localhost:8000 index.php
+```
+
+Or use Composer scripts that handle migrations first:
+
+```bash
+cd backend
+composer run-script serve                  # checks migration status, then starts server
+composer run-script serve:with-migrations  # applies pending migrations, then starts server
 ```
 
 Verify:
