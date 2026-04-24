@@ -4,8 +4,6 @@
 DROP TRIGGER IF EXISTS `trg_user_identity_photos_single_active_ai`;
 DROP TRIGGER IF EXISTS `trg_user_identity_photos_single_active_au`;
 
-DELIMITER $$
-
 CREATE TRIGGER `trg_user_identity_photos_single_active_ai`
 AFTER INSERT ON `user_identity_photos`
 FOR EACH ROW
@@ -18,7 +16,7 @@ BEGIN
           AND `id` <> NEW.`id`
           AND `is_active` = 1;
     END IF;
-END$$
+END;
 
 CREATE TRIGGER `trg_user_identity_photos_single_active_au`
 AFTER UPDATE ON `user_identity_photos`
@@ -32,7 +30,5 @@ BEGIN
           AND `id` <> NEW.`id`
           AND `is_active` = 1;
     END IF;
-END$$
-
-DELIMITER ;
+END;
 

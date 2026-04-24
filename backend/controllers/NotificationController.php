@@ -13,8 +13,8 @@ final class NotificationController extends Controller
     public function index(Request $request): never
     {
         $user  = $request->user();
-        $page  = max(1, (int) $request->query('page', 1));
-        $limit = min(50, max(1, (int) $request->query('limit', 20)));
+        $page  = (int) $request->query('page', 1);
+        $limit = (int) $request->query('limit', 20);
 
         Logger::info('Notifications list requested', [
             'user_id' => (int) $user->id,
@@ -22,20 +22,14 @@ final class NotificationController extends Controller
             'limit' => $limit,
         ]);
 
-        $query = Notification::where('user_id', $user->id)->orderByDesc('created_at');
-
-        $total = (clone $query)->count();
-        $items = $query->forPage($page, $limit)->get()->toArray();
+        $result = Notification::getForUser((int) $user->id, $page, $limit);
+        $items = $result['items'];
+        $meta = $result['meta'];
 
         $this->ok([
             'items'        => $items,
             'unread_count' => Notification::unreadCount((int) $user->id),
-        ], [
-            'page'  => $page,
-            'limit' => $limit,
-            'total' => $total,
-            'pages' => (int) ceil($total / $limit),
-        ]);
+        ], $meta);
     }
 
     public function markRead(Request $request): never

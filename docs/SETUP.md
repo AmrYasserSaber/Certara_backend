@@ -46,6 +46,20 @@ mysql -u root -p irb_system < database/seeds/roles.sql
 mysql -u root -p irb_system < database/seeds/test_users.sql
 ```
 
+When pulling new schema changes later, run from `backend/`:
+
+```bash
+composer migrations:status   # exits 0 when fully up to date, 1 when pending files exist
+composer migrations:up       # applies pending SQL files from database/migrations
+```
+
+`composer migrations:status` is intentionally non-zero when files are pending.
+Composer aborts script arrays on non-zero exits, so keep this in mind when
+chaining prechecks in Composer scripts.
+
+Each SQL migration file should be independently re-runnable/idempotent whenever
+possible. MySQL DDL auto-commits, so a failed migration can leave partial state.
+
 Test accounts (all with password `password`):
 
 | Role                | Email                |
@@ -66,6 +80,14 @@ Using PHP's built-in web server (recommended for local dev):
 ```bash
 cd backend
 php -S localhost:8000 index.php
+```
+
+Or use Composer scripts that handle migrations first:
+
+```bash
+cd backend
+composer run-script serve                  # starts server immediately (no migration precheck)
+composer run-script serve:with-migrations  # applies pending migrations, then starts server
 ```
 
 Verify:
