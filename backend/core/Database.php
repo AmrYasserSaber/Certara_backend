@@ -51,7 +51,10 @@ final class Database
 
     public static function query(string $sql, array $bindings = []): array
     {
-        return self::connection()->select($sql, $bindings);
+        return array_map(
+            static fn ($row): array => (array) $row,
+            self::connection()->select($sql, $bindings)
+        );
     }
 
     public static function fetchOne(string $sql, array $bindings = []): ?array

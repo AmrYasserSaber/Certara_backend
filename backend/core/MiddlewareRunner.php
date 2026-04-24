@@ -12,7 +12,32 @@ final class MiddlewareRunner
     public static function run(array $middleware, Request $request): Request
     {
         foreach ($middleware as $m) {
-            $instance = is_string($m) ? new $m() : $m;
+            if (is_string($m)) {
+                if (!class_exists($m, true)) {
+                    Logger::error('Invalid middleware configuration', [
+                        'middleware_type' => 'missing_class',
+                        'middleware' => $m,
+                        'path' => $request->path(),
+                        'method' => $request->method(),
+                    ]);
+                    Response::error('Invalid middleware configuration.', 500, 'server_error');
+                }
+
+                $reflection = new \ReflectionClass($m);
+                if (!$reflection->isInstantiable()) {
+                    Logger::error('Invalid middleware configuration', [
+                        'middleware_type' => 'non_instantiable_class',
+                        'middleware' => $m,
+                        'path' => $request->path(),
+                        'method' => $request->method(),
+                    ]);
+                    Response::error('Invalid middleware configuration.', 500, 'server_error');
+                }
+
+                $instance = $reflection->newInstance();
+            } else {
+                $instance = $m;
+            }
 
             if (!$instance instanceof Middleware) {
                 Logger::error('Invalid middleware configuration', [

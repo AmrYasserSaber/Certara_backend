@@ -33,11 +33,14 @@ match ($command) {
 
 function ensureMigrationsTable(): void
 {
+    $charset = preg_replace('/[^a-zA-Z0-9_]/', '', (string) env('DB_CHARSET', 'utf8mb4')) ?: 'utf8mb4';
+    $collation = preg_replace('/[^a-zA-Z0-9_]/', '', (string) env('DB_COLLATION', 'utf8mb4_unicode_ci')) ?: 'utf8mb4_unicode_ci';
+
     Database::execute(
         'CREATE TABLE IF NOT EXISTS schema_migrations (
             migration VARCHAR(255) NOT NULL PRIMARY KEY,
             executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        ) ENGINE=InnoDB DEFAULT CHARSET=' . $charset . ' COLLATE=' . $collation
     );
 }
 
@@ -101,39 +104,69 @@ function upCommand(string $migrationsPath): never
         exit(0);
     }
 
-    foreach ($pending as $file) {
-        $name = basename($file);
-        $sql = trim((string) file_get_contents($file));
+    $lockName = 'schema_migrations';
+    if (!acquireMigrationLock($lockName, 10)) {
+        fwrite(STDERR, "Could not acquire migration lock '{$lockName}'. Another migration process may be running.\n");
+        exit(1);
+    }
 
-        if ($sql === '') {
-            fwrite(STDOUT, "Skipping empty migration: {$name}\n");
-            Database::execute('INSERT INTO schema_migrations (migration) VALUES (?)', [$name]);
-            continue;
-        }
+    try {
+        foreach ($pending as $file) {
+            $name = basename($file);
+            $sql = trim((string) file_get_contents($file));
 
-        fwrite(STDOUT, "Applying {$name}...\n");
-
-        try {
-            Database::connection()->unprepared($sql);
-            Database::connection()->insert('INSERT INTO schema_migrations (migration) VALUES (?)', [$name]);
-            fwrite(STDOUT, "Applied {$name}\n");
-        } catch (Throwable $e) {
-            $message = $e->getMessage();
-            fwrite(STDERR, "Failed on {$name}: {$message}\n");
-
-            if (str_contains($message, 'SQLSTATE[42S02]')) {
-                fwrite(STDERR, "\n");
-                fwrite(STDERR, "Your database looks older than the baseline schema.\n");
-                fwrite(STDERR, "Import the latest baseline first, then re-run migrations:\n");
-                fwrite(STDERR, "  mysql -u <user> -p <db_name> < ../database/schema.sql\n");
-                fwrite(STDERR, "  composer run-script migrations:up\n");
+            if ($sql === '') {
+                fwrite(STDOUT, "Skipping empty migration: {$name}\n");
+                markMigrationApplied($name);
+                continue;
             }
-            exit(1);
+
+            fwrite(STDOUT, "Applying {$name}...\n");
+
+            try {
+                Database::connection()->unprepared($sql);
+                markMigrationApplied($name);
+                fwrite(STDOUT, "Applied {$name}\n");
+            } catch (Throwable $e) {
+                $message = $e->getMessage();
+                fwrite(STDERR, "Failed on {$name}: {$message}\n");
+
+                if (str_contains($message, 'SQLSTATE[42S02]')) {
+                    fwrite(STDERR, "\n");
+                    fwrite(STDERR, "Your database looks older than the baseline schema.\n");
+                    fwrite(STDERR, "Import the latest baseline first, then re-run migrations:\n");
+                    fwrite(STDERR, "  mysql -u <user> -p <db_name> < ../database/schema.sql\n");
+                    fwrite(STDERR, "  composer run-script migrations:up\n");
+                }
+
+                fwrite(STDERR, "\n");
+                fwrite(STDERR, "Note: keep each SQL migration independently re-runnable/idempotent.\n");
+                fwrite(STDERR, "MySQL DDL auto-commits and can leave partial state on failure.\n");
+                exit(1);
+            }
         }
+    } finally {
+        releaseMigrationLock($lockName);
     }
 
     fwrite(STDOUT, "All pending migrations applied successfully.\n");
     exit(0);
+}
+
+function markMigrationApplied(string $name): void
+{
+    Database::execute('INSERT INTO schema_migrations (migration) VALUES (?)', [$name]);
+}
+
+function acquireMigrationLock(string $name, int $timeoutSeconds): bool
+{
+    $row = Database::fetchOne('SELECT GET_LOCK(?, ?) AS lock_ok', [$name, $timeoutSeconds]);
+    return (int) ($row['lock_ok'] ?? 0) === 1;
+}
+
+function releaseMigrationLock(string $name): void
+{
+    Database::fetchOne('SELECT RELEASE_LOCK(?) AS lock_released', [$name]);
 }
 
 function invalidCommand(string $command): never

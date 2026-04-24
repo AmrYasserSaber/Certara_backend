@@ -53,6 +53,13 @@ composer migrations:status   # exits 0 when fully up to date, 1 when pending fil
 composer migrations:up       # applies pending SQL files from database/migrations
 ```
 
+`composer migrations:status` is intentionally non-zero when files are pending.
+Composer aborts script arrays on non-zero exits, so keep this in mind when
+chaining prechecks in Composer scripts.
+
+Each SQL migration file should be independently re-runnable/idempotent whenever
+possible. MySQL DDL auto-commits, so a failed migration can leave partial state.
+
 Test accounts (all with password `password`):
 
 | Role                | Email                |
@@ -79,7 +86,7 @@ Or use Composer scripts that handle migrations first:
 
 ```bash
 cd backend
-composer run-script serve                  # checks migration status, then starts server
+composer run-script serve                  # starts server immediately (no migration precheck)
 composer run-script serve:with-migrations  # applies pending migrations, then starts server
 ```
 

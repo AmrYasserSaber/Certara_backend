@@ -58,9 +58,12 @@ class Notification extends Model
         $page = max(1, $page);
         $limit = min(50, max(1, $limit));
 
-        $query = self::where('user_id', $userId)->orderByDesc('created_at');
+        $query = self::where('user_id', $userId)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
         $total = (clone $query)->count();
         $items = $query->forPage($page, $limit)->get()->toArray();
+        $pages = max(1, (int) ceil($total / $limit));
 
         return [
             'items' => $items,
@@ -68,7 +71,7 @@ class Notification extends Model
                 'page' => $page,
                 'limit' => $limit,
                 'total' => $total,
-                'pages' => (int) ceil($total / $limit),
+                'pages' => $pages,
             ],
         ];
     }
