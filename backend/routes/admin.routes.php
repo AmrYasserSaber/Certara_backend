@@ -30,6 +30,7 @@ $router->get('/api/admin/users/pending', [AdminController::class, 'pendingUsers'
 $router->put('/api/admin/users/{id}/activate', [AdminController::class, 'activateUser'], $adminMiddleware);
 $router->put('/api/admin/users/{id}/reject', [AdminController::class, 'rejectUser'], $adminMiddleware);
 $router->get('/api/admin/research', [AdminController::class, 'researchList'], $adminMiddleware);
+$router->get('/api/admin/research/{id}', [AdminController::class, 'researchDetail'], $adminMiddleware);
 $router->put('/api/admin/research/{id}/assign-reviewer', [AdminController::class, 'assignReviewer'], $adminMiddleware);
 $router->post('/api/admin/research/{id}/serial', [AdminController::class, 'generateSerial'], $adminMiddleware);
 $router->get('/api/admin/logs', [AdminController::class, 'logs'], $adminMiddleware);
