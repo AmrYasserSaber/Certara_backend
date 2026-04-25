@@ -43,8 +43,9 @@ final class ResearchController extends Controller
         $this->created($research);
     }
 
-    public function show(Request $request, int $id): never
+    public function show(Request $request): never
     {
+        $id = (int) $request->param('id');
         $studentId = $request->user()->id;
         $research = Research::where('student_id', $studentId)->find($id);
 
@@ -55,8 +56,9 @@ final class ResearchController extends Controller
         $this->ok($research);
     }
 
-    public function update(Request $request, int $id): never
+    public function update(Request $request): never
     {
+        $id = (int) $request->param('id');
         $studentId = $request->user()->id;
         $research = Research::where('student_id', $studentId)->find($id);
 
