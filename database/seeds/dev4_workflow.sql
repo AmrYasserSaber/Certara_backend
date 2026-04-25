@@ -6,11 +6,11 @@ START TRANSACTION;
 -- Remove any previous demo rows so the script can be rerun safely.
 DELETE FROM activity_logs
 WHERE target_type = 'research'
-    AND target_id IN (101, 102, 103, 104, 105);
+    AND target_id IN (101, 102, 103, 104, 105, 106, 107);
 DELETE FROM notifications
-WHERE research_id IN (101, 102, 103, 104, 105);
+WHERE research_id IN (101, 102, 103, 104, 105, 106, 107);
 DELETE FROM research
-WHERE id IN (101, 102, 103, 104, 105);
+WHERE id IN (101, 102, 103, 104, 105, 106, 107);
 INSERT INTO `research` (
         `id`,
         `student_id`,
@@ -82,6 +82,30 @@ VALUES (
         'Epidemiology',
         'IRB-2026-0105',
         'rejected'
+    ),
+    (
+        106,
+        5,
+        'Prospective Cohort on Emergency Triage Quality Indicators',
+        'Dr. Khaled Fawzy',
+        'Dr. Nada Mostafa',
+        'Emergency Medicine',
+        'Medicine',
+        'Emergency Care',
+        NULL,
+        'pending_activation'
+    ),
+    (
+        107,
+        5,
+        'Longitudinal Analysis of Hypertension Control in Primary Care',
+        'Dr. Rania El-Sayed',
+        'Dr. Hossam Nader',
+        'Internal Medicine',
+        'Medicine',
+        'Cardiovascular Epidemiology',
+        'IRB-2026-0107',
+        'reviewer_approved'
     );
 INSERT INTO `documents` (
         `id`,
@@ -130,6 +154,22 @@ VALUES (
         'uploads/documents/105-protocol.pdf',
         'vitamin-supplement-protocol.pdf',
         118900
+    ),
+    (
+        1006,
+        106,
+        'protocol',
+        'uploads/documents/106-protocol.pdf',
+        'emergency-triage-protocol.pdf',
+        126300
+    ),
+    (
+        1007,
+        107,
+        'protocol',
+        'uploads/documents/107-protocol.pdf',
+        'hypertension-control-protocol.pdf',
+        136450
     );
 INSERT INTO `payments` (
         `id`,
@@ -218,6 +258,28 @@ VALUES (
         'cashair',
         'CASHAIR-DEMO-0105-1',
         NULL
+    ),
+    (
+        2008,
+        107,
+        500.00,
+        'EGP',
+        'first',
+        'paid',
+        'cashair',
+        'CASHAIR-DEMO-0107-1',
+        NOW()
+    ),
+    (
+        2009,
+        107,
+        500.00,
+        'EGP',
+        'second',
+        'paid',
+        'cashair',
+        'CASHAIR-DEMO-0107-2',
+        NOW()
     );
 INSERT INTO `sample_sizes` (
         `id`,
@@ -250,6 +312,14 @@ VALUES (
         140,
         'Full clinical cohort estimate.',
         600.00
+    ),
+    (
+        3004,
+        107,
+        3,
+        110,
+        'Calculated with design effect and 10% dropout contingency.',
+        450.00
     );
 INSERT INTO `reviews` (
         `id`,
@@ -262,7 +332,8 @@ INSERT INTO `reviews` (
 VALUES (4001, 102, 4, 'in_progress', NULL, NULL),
     (4002, 103, 4, 'decided', 'approved', NOW()),
     (4003, 104, 4, 'decided', 'approved', NOW()),
-    (4004, 105, 4, 'decided', 'rejected', NOW());
+    (4004, 105, 4, 'decided', 'rejected', NOW()),
+    (4005, 107, 4, 'decided', 'approved', NOW());
 INSERT INTO `review_comments` (`id`, `review_id`, `reviewer_id`, `comment_text`)
 VALUES (
         5001,
@@ -281,6 +352,12 @@ VALUES (
         4004,
         4,
         'The protocol requires substantial revision before reconsideration.'
+    ),
+    (
+        5004,
+        4005,
+        4,
+        'Statistical plan is adequate and risk mitigation is clearly documented. Recommended for final manager approval.'
     );
 INSERT INTO `certificates` (
         `id`,
@@ -342,6 +419,24 @@ VALUES (
         'تم رفض بحثك رقم IRB-2026-0105 بعد المراجعة النهائية.',
         0,
         105
+    ),
+    (
+        7005,
+        2,
+        'review_requested',
+        'بحث بانتظار القرار النهائي',
+        'البحث IRB-2026-0107 وصل إلى حالة reviewer_approved ويحتاج قرار المدير.',
+        0,
+        107
+    ),
+    (
+        7006,
+        5,
+        'payment_confirmed',
+        'تم تجهيز البحث للمراجعة الإدارية',
+        'بحثك بعنوان Emergency Triage جاهز لإجراء توليد الرقم التسلسلي من الإدارة.',
+        0,
+        106
     );
 INSERT INTO `activity_logs` (
         `id`,
@@ -390,6 +485,26 @@ VALUES (
         'research',
         104,
         '{"certificate_number":"CERT-2026-0104","file_path":"uploads/certificates/seed-certificate-104.pdf"}',
+        '127.0.0.1',
+        'seed-data'
+    ),
+    (
+        8005,
+        4,
+        'reviewer.decision_submitted',
+        'research',
+        107,
+        '{"decision":"approved","review_id":4005}',
+        '127.0.0.1',
+        'seed-data'
+    ),
+    (
+        8006,
+        1,
+        'admin.research_pending_activation',
+        'research',
+        106,
+        '{"status":"pending_activation","note":"ready_for_serial_generation"}',
         '127.0.0.1',
         'seed-data'
     );

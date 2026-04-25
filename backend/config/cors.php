@@ -11,7 +11,14 @@ return (static function (): void {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
     if ($allowed === ['*']) {
-        header('Access-Control-Allow-Origin: *');
+        if ($origin !== '') {
+            // Cookie-based auth requires explicit origin (not '*') + credentials=true.
+            header('Access-Control-Allow-Origin: ' . $origin);
+            header('Vary: Origin');
+            header('Access-Control-Allow-Credentials: true');
+        } else {
+            header('Access-Control-Allow-Origin: *');
+        }
     } elseif ($origin !== '' && in_array($origin, $allowed, true)) {
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Vary: Origin');
