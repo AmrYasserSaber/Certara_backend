@@ -44,6 +44,7 @@ mysql -u root -p -e "CREATE DATABASE irb_system CHARACTER SET utf8mb4 COLLATE ut
 mysql -u root -p irb_system < database/schema.sql
 mysql -u root -p irb_system < database/seeds/roles.sql
 mysql -u root -p irb_system < database/seeds/test_users.sql
+mysql -u root -p irb_system < database/seeds/dev4_workflow.sql
 ```
 
 When pulling new schema changes later, run from `backend/`:
@@ -61,6 +62,8 @@ Each SQL migration file should be independently re-runnable/idempotent whenever
 possible. MySQL DDL auto-commits, so a failed migration can leave partial state.
 
 Test accounts (all with password `password`):
+
+The optional DEV 4 workflow seed adds demo research, reviews, payments, logs, and certificates for admin/manager testing.
 
 | Role                | Email                |
 | ------------------- | -------------------- |

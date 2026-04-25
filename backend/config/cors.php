@@ -5,14 +5,18 @@ declare(strict_types=1);
 return (static function (): void {
     $allowed = array_filter(array_map(
         'trim',
-        explode(',', (string) env('CORS_ALLOWED_ORIGINS', '*'))
+        explode(',', (string) env('CORS_ALLOWED_ORIGINS', ''))
     ));
 
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
+    // Public mode: wildcard allowed, but NO credentials
     if ($allowed === ['*']) {
         header('Access-Control-Allow-Origin: *');
-    } elseif ($origin !== '' && in_array($origin, $allowed, true)) {
+    }
+
+    // Credentialed mode: explicit allowlist only
+    elseif ($origin !== '' && in_array($origin, $allowed, true)) {
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Vary: Origin');
         header('Access-Control-Allow-Credentials: true');
