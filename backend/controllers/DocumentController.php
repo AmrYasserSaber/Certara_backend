@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Enums\Roles;
 use App\Models\Research;
 use App\Models\Document;
+use App\Models\Review;
 use App\Helpers\UploadHelper;
 use App\Enums\ResearchStatus;
 
@@ -16,7 +18,7 @@ final class DocumentController extends Controller
     {
         $researchId = (int) $request->param('id');
         $studentId = $request->user()->id;
-        
+
         $research = Research::where('student_id', $studentId)->find($researchId);
         if (!$research) {
             $this->fail('Research not found.', 404, 'not_found');
@@ -27,7 +29,7 @@ final class DocumentController extends Controller
         // For simplicity and matching common patterns, we'll assume a single 'type' for this batch
         // or default to 'protocol' if not provided.
         $type = $request->input('type', 'protocol');
-        
+
         $files = $_FILES['documents'] ?? null;
         if (!$files) {
             $this->fail('No documents uploaded.', 400, 'missing_files');
@@ -76,9 +78,20 @@ final class DocumentController extends Controller
     public function index(Request $request): never
     {
         $researchId = (int) $request->param('id');
-        $studentId = $request->user()->id;
+        $userId = (int) ($request->user()->id ?? 0);
+        $role = (string) ($request->user()->role ?? '');
 
-        $research = Research::where('student_id', $studentId)->find($researchId);
+        if ($role === Roles::REVIEWER) {
+            $review = Review::findByResearchAndReviewer($researchId, $userId);
+            if ($review === false) {
+                $this->fail('Research not found.', 404, 'not_found');
+            }
+
+            $research = Research::find($researchId);
+        } else {
+            $research = Research::where('student_id', $userId)->find($researchId);
+        }
+
         if (!$research) {
             $this->fail('Research not found.', 404, 'not_found');
         }
@@ -115,7 +128,7 @@ final class DocumentController extends Controller
     private function normalizeFiles(array $files): array
     {
         $normalized = [];
-        
+
         // Check if $files['name'] is an array (multiple files)
         if (isset($files['name']) && is_array($files['name'])) {
             foreach ($files['name'] as $key => $name) {
@@ -132,7 +145,7 @@ final class DocumentController extends Controller
         } elseif (isset($files['name'])) {
             $normalized[] = $files;
         }
-        
+
         return $normalized;
     }
 }
