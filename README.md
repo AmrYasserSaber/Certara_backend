@@ -36,7 +36,7 @@ Certara_backend/
 │   └── composer.json
 ├── database/
 │   ├── schema.sql            Full DB schema
-│   ├── seeds/                roles.sql + test_users.sql
+│   ├── seeds/                roles.sql + test_users.sql + dev4_workflow.sql
 │   └── migrations/           Future migrations
 ├── docs/
 │   ├── API.md                Endpoint contract + ownership matrix
@@ -84,6 +84,7 @@ mysql -u root -p -e "CREATE DATABASE irb_system CHARACTER SET utf8mb4 COLLATE ut
 mysql -u root -p irb_system < ../database/schema.sql
 mysql -u root -p irb_system < ../database/seeds/roles.sql
 mysql -u root -p irb_system < ../database/seeds/test_users.sql
+mysql -u root -p irb_system < ../database/seeds/dev4_workflow.sql
 php -S localhost:8000 index.php
 curl http://localhost:8000/api/health
 ```

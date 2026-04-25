@@ -13,6 +13,18 @@ final class Database
 {
     private static ?Capsule $capsule = null;
 
+    /**
+     * Backwards-compatible accessor that returns a handle-like object.
+     *
+     * The current codebase mostly uses static calls, but some modules expect a
+     * getInstance() entry point. Returning an instance keeps that contract
+     * available without changing the existing public API surface.
+     */
+    public static function getInstance(): self
+    {
+        return new self();
+    }
+
     public static function boot(array $config): void
     {
         if (self::$capsule !== null) {

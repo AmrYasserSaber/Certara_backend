@@ -29,12 +29,23 @@ final class RoleMiddleware implements Middleware
         }
 
         $user = $request->user();
-        if (!is_object($user) || !property_exists($user, 'role')) {
+        if (!is_object($user)) {
             Logger::warning('Role middleware failed: unauthenticated');
             Response::error('Unauthenticated.', 401, 'unauthenticated');
         }
 
+        // Support both stdClass and Eloquent models
         $role = (string) ($user->role ?? '');
+        if ($role === '' && method_exists($user, 'getAttribute')) {
+            // Eloquent model - use getAttribute method
+            $role = (string) ($user->getAttribute('role') ?? '');
+        }
+
+        if ($role === '') {
+            Logger::warning('Role middleware failed: missing role attribute');
+            Response::error('Unauthenticated.', 401, 'unauthenticated');
+        }
+
         if (!in_array($role, $this->allowedRoles, true)) {
             Logger::warning('Role middleware blocked: forbidden role', [
                 'role' => $role,

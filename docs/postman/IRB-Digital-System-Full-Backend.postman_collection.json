@@ -1,0 +1,688 @@
+{
+  "info": {
+    "_postman_id": "8e3a0f41-5c6b-4e7a-9d1f-4f2d3c6b7a8e",
+    "name": "IRB Digital System - Full Backend",
+    "description": "Complete backend Postman collection for all routed endpoints in Certara backend.\n\nAuth model:\n- Login sets cookies (IRB_ACCESS_TOKEN, IRB_REFRESH_TOKEN, IRB_CSRF_TOKEN)\n- Protected endpoints use Cookie header from environment vars\n- State-changing endpoints require X-CSRF-Token header\n\nQuick flow:\n1) Health\n2) Auth > Login (Admin/Manager/Student)\n3) Call protected endpoints\n4) Use Role Switch requests to log in as each role\n\nResponse envelope:\n{ success, data, error, meta }",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get('baseUrl')) pm.environment.set('baseUrl', 'http://localhost:8000');",
+          "if (!pm.environment.get('researchId')) pm.environment.set('researchId', '104');",
+          "if (!pm.environment.get('userId')) pm.environment.set('userId', '5');",
+          "if (!pm.environment.get('reviewerId')) pm.environment.set('reviewerId', '4');",
+          "if (!pm.environment.get('notificationId')) pm.environment.set('notificationId', '1');"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('Envelope has success field', function () {",
+          "  const ct = pm.response.headers.get('Content-Type') || '';",
+          "  if (ct.includes('application/json')) {",
+          "    const body = pm.response.json();",
+          "    pm.expect(body).to.have.property('success');",
+          "  }",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "csrfToken", "value": "" },
+    { "key": "researchId", "value": "104" },
+    { "key": "decisionResearchId", "value": "103" },
+    { "key": "userId", "value": "5" },
+    { "key": "reviewerId", "value": "4" },
+    { "key": "notificationId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "00 - Health",
+      "item": [
+        {
+          "name": "GET /api/health",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/health",
+            "description": "Example 200 response includes service, env, php and database.ok"
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 - Auth",
+      "item": [
+        {
+          "name": "POST /api/auth/register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Student New\",\n  \"email\": \"student.new@example.com\",\n  \"password\": \"password123\",\n  \"phone\": \"01012345678\",\n  \"department\": \"Surgery\",\n  \"faculty\": \"Medicine\",\n  \"specialization\": \"General Surgery\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register",
+            "description": "Creates a pending student account.\nExample success code: 201"
+          }
+        },
+        {
+          "name": "POST /api/auth/login (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login success', function () { pm.response.to.have.status(200); });",
+                  "const cookies = pm.response.headers.all().filter(h => h.key.toLowerCase() === 'set-cookie').map(h => h.value);",
+                  "function getCookie(name) {",
+                  "  const row = cookies.find(c => c.startsWith(name + '='));",
+                  "  if (!row) return '';",
+                  "  return row.split(';')[0].substring(name.length + 1);",
+                  "}",
+                  "const access = getCookie('IRB_ACCESS_TOKEN');",
+                  "const refresh = getCookie('IRB_REFRESH_TOKEN');",
+                  "const csrf = getCookie('IRB_CSRF_TOKEN');",
+                  "if (access) pm.environment.set('accessToken', access);",
+                  "if (refresh) pm.environment.set('refreshToken', refresh);",
+                  "if (csrf) pm.environment.set('csrfToken', csrf);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@irb.local\",\n  \"password\": \"password\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Stores tokens into environment vars: accessToken, refreshToken, csrfToken"
+          }
+        },
+        {
+          "name": "POST /api/auth/login (Manager)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"manager@irb.local\",\n  \"password\": \"password\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Use this to switch current role context to manager"
+          }
+        },
+        {
+          "name": "POST /api/auth/login (Student)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"student@irb.local\",\n  \"password\": \"password\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Use this to switch current role context to student"
+          }
+        },
+        {
+          "name": "POST /api/auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/auth/logout"
+          }
+        },
+        {
+          "name": "GET /api/auth/me",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "GET /api/auth/test",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/test"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Notifications",
+      "item": [
+        {
+          "name": "GET /api/notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notifications"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PUT /api/notifications/read-all",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/notifications/read-all"
+          }
+        },
+        {
+          "name": "PUT /api/notifications/{id}/read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/notifications/{{notificationId}}/read"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - User Files",
+      "item": [
+        {
+          "name": "GET /api/users/me/avatar",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/me/avatar"
+          }
+        },
+        {
+          "name": "POST /api/users/me/avatar",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "avatar",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/users/me/avatar",
+            "description": "Upload JPEG/PNG avatar with form-data field name: avatar"
+          }
+        },
+        {
+          "name": "POST /api/users/me/identity",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "type",
+                  "value": "front",
+                  "type": "text"
+                },
+                {
+                  "key": "id_photo",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/users/me/identity",
+            "description": "Example: type = front|back, file field id_photo (or id_front/id_back)"
+          }
+        },
+        {
+          "name": "GET /api/users/me/identity/url",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/identity/url?type=front",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me", "identity", "url"],
+              "query": [{ "key": "type", "value": "front" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Admin",
+      "item": [
+        {
+          "name": "GET /api/admin/users/pending",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/pending?page=1&limit=20&status=pending&q=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users", "pending"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "status", "value": "pending" },
+                { "key": "q", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PUT /api/admin/users/{id}/activate",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/users/{{userId}}/activate"
+          }
+        },
+        {
+          "name": "PUT /api/admin/users/{id}/reject",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const configuredId = (pm.environment.get('userId') || '').trim();",
+                  "if (configuredId) {",
+                  "  console.log('Using configured userId for reject:', configuredId);",
+                  "} else {",
+                  "  const cookieHeader = `IRB_ACCESS_TOKEN=${pm.environment.get('accessToken') || ''}; IRB_REFRESH_TOKEN=${pm.environment.get('refreshToken') || ''}; IRB_CSRF_TOKEN=${pm.environment.get('csrfToken') || ''}`;",
+                  "  pm.sendRequest({",
+                  "    url: `${pm.environment.get('baseUrl')}/api/admin/users/pending?page=1&limit=20&status=pending`,",
+                  "    method: 'GET',",
+                  "    header: {",
+                  "      'Accept': 'application/json',",
+                  "      'Cookie': cookieHeader",
+                  "    }",
+                  "  }, function (err, res) {",
+                  "    if (err) {",
+                  "      console.log('Failed to auto-load pending users before reject', err);",
+                  "      return;",
+                  "    }",
+                  "    let body = null;",
+                  "    try { body = res.json(); } catch (e) { body = null; }",
+                  "    const firstPendingId = body?.data?.items?.[0]?.id;",
+                  "    if (firstPendingId) {",
+                  "      pm.environment.set('userId', String(firstPendingId));",
+                  "      console.log('Auto-selected pending userId for reject:', firstPendingId);",
+                  "    } else {",
+                  "      console.log('No pending user found to auto-select for reject request');",
+                  "    }",
+                  "  });",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Reject request returns success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.have.property('user');",
+                  "  pm.expect(body.data.user).to.have.property('status', 'rejected');",
+                  "});",
+                  "try {",
+                  "  const body = pm.response.json();",
+                  "  const rejectedId = body?.data?.user?.id;",
+                  "  if (rejectedId) pm.environment.set('userId', String(rejectedId));",
+                  "} catch (e) {}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Missing required profile data\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/users/{{userId}}/reject"
+          }
+        },
+        {
+          "name": "GET /api/admin/research",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/research?page=1&limit=20&status=&department=&date=&q=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "research"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "status", "value": "" },
+                { "key": "department", "value": "" },
+                { "key": "date", "value": "" },
+                { "key": "q", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PUT /api/admin/research/{id}/assign-reviewer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reviewer_id\": \"{{reviewerId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/admin/research/{{researchId}}/assign-reviewer"
+          }
+        },
+        {
+          "name": "POST /api/admin/research/{id}/serial",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/research/{{researchId}}/serial",
+            "description": "Generates serial when research status is pending_activation"
+          }
+        },
+        {
+          "name": "GET /api/admin/logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/logs?page=1&limit=20&action=&target_type=&actor_id=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "logs"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "action", "value": "" },
+                { "key": "target_type", "value": "" },
+                { "key": "actor_id", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/admin/reviewers",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/admin/reviewers"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Manager",
+      "item": [
+        {
+          "name": "GET /api/manager/research/reviewed",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/manager/research/reviewed?page=1&limit=20&q=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "manager", "research", "reviewed"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "q", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/manager/research/{id}",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/manager/research/{{decisionResearchId}}"
+          }
+        },
+        {
+          "name": "PUT /api/manager/research/{id}/decision",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approved\",\n  \"note\": \"Looks good after reviewer approval\"\n}"
+            },
+            "url": "{{baseUrl}}/api/manager/research/{{decisionResearchId}}/decision",
+            "description": "decision accepted values: approved|approve|accept|rejected|reject|decline"
+          }
+        },
+        {
+          "name": "GET /api/manager/dashboard/stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/manager/dashboard/stats",
+            "description": "Example response keys: queue, approved, rejected, certificates, finalized, issuance_rate"
+          }
+        },
+        {
+          "name": "POST /api/manager/research/{id}/certificate",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/manager/research/{{researchId}}/certificate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Certificates (Shared Access)",
+      "item": [
+        {
+          "name": "GET /api/research/{id}/certificate",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/pdf" },
+              {
+                "key": "Cookie",
+                "value": "IRB_ACCESS_TOKEN={{accessToken}}; IRB_REFRESH_TOKEN={{refreshToken}}; IRB_CSRF_TOKEN={{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/research/{{researchId}}/certificate",
+            "description": "Allowed roles: admin, manager, student (student can only download own research certificate)"
+          }
+        }
+      ]
+    }
+  ]
+}
