@@ -69,9 +69,28 @@ final class DocumentController extends Controller
             $this->fail('Upload failed.', 422, 'upload_error', $errors);
         }
 
+        // Auto-submit logic: Check if all 4 required documents exist
+        $requiredTypes = ['protocol', 'coi', 'application', 'checklist'];
+        $existingTypes = Document::where('research_id', $researchId)
+            ->pluck('type')
+            ->toArray();
+
+        $allUploaded = true;
+        foreach ($requiredTypes as $reqType) {
+            if (!in_array($reqType, $existingTypes, true)) {
+                $allUploaded = false;
+                break;
+            }
+        }
+
+        if ($allUploaded && $research->status === ResearchStatus::DRAFT) {
+            $research->update(['status' => ResearchStatus::PENDING_ACTIVATION]);
+        }
+
         $this->created([
             'documents' => $uploadedDocuments,
-            'errors'    => $errors ?: null
+            'errors'    => $errors ?: null,
+            'status'    => Research::find($researchId)->status // Return updated status
         ]);
     }
 
