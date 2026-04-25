@@ -53,13 +53,32 @@ final class DocumentController extends Controller
                 $directory = "uploads/documents/{$researchId}";
                 $path = UploadHelper::saveFile($file, $directory);
 
-                $uploadedDocuments[] = Document::create([
-                    'research_id'   => $researchId,
-                    'type'          => $fileType,
-                    'file_path'     => $path,
-                    'original_name' => $file['name'],
-                    'size_bytes'    => $file['size'],
-                ]);
+                // Check if a document of this type already exists for this research
+                $existingDoc = Document::where('research_id', $researchId)
+                    ->where('type', $fileType)
+                    ->first();
+
+                if ($existingDoc) {
+                    // Delete the old file
+                    UploadHelper::deleteFile($existingDoc->file_path);
+                    
+                    // Update existing record
+                    $existingDoc->update([
+                        'file_path'     => $path,
+                        'original_name' => $file['name'],
+                        'size_bytes'    => $file['size'],
+                    ]);
+                    $uploadedDocuments[] = $existingDoc;
+                } else {
+                    // Create new record
+                    $uploadedDocuments[] = Document::create([
+                        'research_id'   => $researchId,
+                        'type'          => $fileType,
+                        'file_path'     => $path,
+                        'original_name' => $file['name'],
+                        'size_bytes'    => $file['size'],
+                    ]);
+                }
             } catch (\Exception $e) {
                 $errors[] = "File {$index}: " . $e->getMessage();
             }
