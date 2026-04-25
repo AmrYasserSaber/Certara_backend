@@ -6,6 +6,7 @@ namespace App\Helpers;
 
 use App\Models\RefreshToken;
 use App\Models\User;
+use App\Models\UserAvatar;
 use App\Helpers\JWTHelper;
 use App\Helpers\CookieHelper;
 
@@ -62,10 +63,16 @@ final class AuthService
 
     public static function buildSafeUser(User $user): array
     {
+        /** @var UserAvatar|null $activeAvatar */
+        $activeAvatar = $user->activeAvatar ?? null;
+        $url = $activeAvatar === null ? '' : (string) ($activeAvatar->file_url ?? '');
+        $avatarUrl = $url === '' ? null : $url;
+
         return [
             'id'             => (int) $user->id,
             'name'           => (string) ($user->name ?? ''),
             'email'          => (string) ($user->email ?? ''),
+            'avatar_url'     => $avatarUrl,
             'phone'          => $user->phone === null ? null : (string) $user->phone,
             'national_id'    => $user->national_id === null ? null : (string) $user->national_id,
             'department'     => $user->department === null ? null : (string) $user->department,
