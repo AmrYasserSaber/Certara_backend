@@ -61,23 +61,70 @@ final class PaymentController extends Controller
             'gateway'     => 'fawry',
         ]);
 
-        // Mock Fawry Integration
-        $merchantCode = '1tSa67zS02nCOeb0mxp93gu';
-        $merchantRefNum = 'REF-' . $payment->id . '-' . time();
-        $payment->update(['gateway_ref' => $merchantRefNum]);
-
-        // In a real integration, we would call Fawry API to get a checkout URL or charge reference
-        // For now, we mock the redirection URL
-        $checkoutUrl = "https://developer.fawrystaging.com/mock-pay?ref={$merchantRefNum}&amount={$amount}";
-        $payment->update(['checkout_url' => $checkoutUrl]);
-
-        // For demo purposes, we provide a way to "simulate" success immediately if needed
-        // but here we just return the URL
+        // Real Fawry B2B API Integration (Staging)
+        $merchantCode = env('FAWRY_MERCH_CODE', '1tSa6uxz2nTwlaAmt38enA==');
+        $secureKey = env('FAWRY_SECURE_KEY', '259af31fc2f74453b3a55739b21ae9ef');
+        $merchantRefNum = 'CERTARA-' . $payment->id . '-' . time();
+        $customerProfileId = (string) $research->student_id;
+        $paymentMethod = 'PayAtFawry';
+        $amountStr = number_format($amount, 2, '.', '');
         
+        // signature = hash('sha256', merchantCode + merchantRefNum + customerProfileId + paymentMethod + amount + merchant_sec_key)
+        $signatureStr = $merchantCode . $merchantRefNum . $customerProfileId . $paymentMethod . $amountStr . $secureKey;
+        $signature = hash('sha256', $signatureStr);
+
+        $payload = [
+            'merchantCode' => $merchantCode,
+            'merchantRefNum' => $merchantRefNum,
+            'customerName' => $research->student->name ?? 'Student ' . $research->student_id,
+            'customerMobile' => $research->student->phone ?? '01000000000',
+            'customerEmail' => $research->student->email ?? 'student@example.com',
+            'customerProfileId' => $customerProfileId,
+            'amount' => $amountStr,
+            'paymentExpiry' => (time() + 48 * 3600) * 1000,
+            'currencyCode' => 'EGP',
+            'language' => 'ar-eg',
+            'chargeItems' => [
+                [
+                    'itemId' => $paymentType,
+                    'description' => 'IRB Research Payment - ' . $paymentType,
+                    'price' => $amountStr,
+                    'quantity' => 1
+                ]
+            ],
+            'signature' => $signature,
+            'paymentMethod' => $paymentMethod,
+            'description' => 'Research ID ' . $research->id . ' Payment'
+        ];
+
+        $ch = curl_init('https://atfawry.fawrystaging.com/ECommerceWeb/Fawry/payments/charge');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json', 'Accept: application/json']);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if (!$response) {
+            $this->fail('فشل التواصل مع خوادم الدفع. يرجى المحاولة لاحقاً', 500, 'gateway_error');
+        }
+
+        $fawryData = json_decode($response, true);
+        
+        if ($httpCode >= 400 || !isset($fawryData['referenceNumber'])) {
+            \App\Core\Logger::error('Fawry API Error', ['payload' => $payload, 'response' => $fawryData]);
+            $this->fail('فشل التواصل مع خوادم الدفع. يرجى المحاولة لاحقاً', 500, 'gateway_error');
+        }
+
+        $payment->update([
+            'gateway_ref' => $fawryData['referenceNumber']
+        ]);
+
         $this->ok([
             'payment_id'   => $payment->id,
             'amount'       => $payment->amount,
-            'checkout_url' => $checkoutUrl,
+            'fawry_reference' => $fawryData['referenceNumber'],
             'status'       => $payment->status,
         ]);
     }
