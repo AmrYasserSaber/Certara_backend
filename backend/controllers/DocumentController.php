@@ -36,10 +36,11 @@ final class DocumentController extends Controller
         $uploadedDocuments = [];
         $errors = [];
 
-        // Normalize files array if multiple
+        // Normalize files array and use keys as types if they are provided as documents[type]
         $normalizedFiles = $this->normalizeFiles($files);
 
-        foreach ($normalizedFiles as $index => $file) {
+        foreach ($normalizedFiles as $file) {
+            $fileType = $file['key'] ?? $type; // Use the key from FormData if available
             $error = UploadHelper::validatePDF($file);
             if ($error) {
                 $errors[] = "File {$index}: {$error}";
@@ -52,7 +53,7 @@ final class DocumentController extends Controller
 
                 $uploadedDocuments[] = Document::create([
                     'research_id'   => $researchId,
-                    'type'          => $type,
+                    'type'          => $fileType,
                     'file_path'     => $path,
                     'original_name' => $file['name'],
                     'size_bytes'    => $file['size'],
@@ -114,19 +115,24 @@ final class DocumentController extends Controller
     private function normalizeFiles(array $files): array
     {
         $normalized = [];
-        if (is_array($files['name'])) {
-            foreach ($files['name'] as $i => $name) {
+        
+        // Check if $files['name'] is an array (multiple files)
+        if (isset($files['name']) && is_array($files['name'])) {
+            foreach ($files['name'] as $key => $name) {
+                if (empty($name)) continue;
                 $normalized[] = [
-                    'name'     => $files['name'][$i],
-                    'type'     => $files['type'][$i],
-                    'tmp_name' => $files['tmp_name'][$i],
-                    'error'    => $files['error'][$i],
-                    'size'     => $files['size'][$i],
+                    'key'      => $key, // This will be 'protocol', 'consent', etc.
+                    'name'     => $files['name'][$key],
+                    'type'     => $files['type'][$key],
+                    'tmp_name' => $files['tmp_name'][$key],
+                    'error'    => $files['error'][$key],
+                    'size'     => $files['size'][$key],
                 ];
             }
-        } else {
+        } elseif (isset($files['name'])) {
             $normalized[] = $files;
         }
+        
         return $normalized;
     }
 }
