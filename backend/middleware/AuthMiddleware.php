@@ -57,7 +57,9 @@ final class AuthMiddleware implements Middleware
         }
 
         /** @var User|null $user */
-        $user = User::find($userId);
+        $user = User::query()
+            ->with('activeAvatar')
+            ->find($userId);
         if ($user === null) {
             Logger::warning('Auth middleware failed: user not found', ['user_id' => $userId]);
             CookieHelper::clearAuthCookies();
@@ -98,7 +100,9 @@ final class AuthMiddleware implements Middleware
         }
 
         /** @var User|null $user */
-        $user = User::find($userId);
+        $user = User::query()
+            ->with('activeAvatar')
+            ->find($userId);
         if ($user !== null && (string) ($user->status ?? '') !== 'active') {
             Logger::warning('Access token rejected: inactive account', [
                 'user_id' => (int) $user->id,

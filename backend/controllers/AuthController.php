@@ -4,12 +4,22 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Core\Database;
 use App\Core\Request;
 use App\Core\Logger;
+use App\Enums\IdentityPhotoType;
 use App\Helpers\AuthService;
 use App\Helpers\EmailHelper;
 use App\Helpers\JWTHelper;
 use App\Models\User;
+use App\Models\UserIdentityPhoto;
+use App\Services\FileUploadService;
+use App\Services\ImageKitClient;
+use App\Services\UploadedFileValidator;
+use App\Services\UploadContext;
+use App\Services\UploadException;
+use App\Services\UploadStrategies\StudentIdFrontUpload;
+use App\Services\UploadStrategies\StudentIdBackUpload;
 
 final class AuthController extends Controller
 {
@@ -24,11 +34,19 @@ final class AuthController extends Controller
             'name'       => 'required|string|trim|min:2|max:150',
             'email'      => 'required|string|trim|email|max:190',
             'password'   => 'required|string|min:8|max:255',
-            'phone'      => 'nullable|string|trim|phone_eg',
-            'department' => 'nullable|string|trim|min:2|max:150',
-            'faculty'    => 'nullable|string|trim|min:2|max:150',
-            'specialization' => 'nullable|string|trim|min:2|max:150',
+            'password_confirmation' => 'required|string|min:8|max:255',
+            'phone'      => 'required|string|trim|phone_eg',
+            'national_id' => 'required|string|trim|regex:/^\\d{14}$/',
+            'department' => 'required|string|trim|min:2|max:150',
+            'faculty'    => 'required|string|trim|min:2|max:150',
+            'specialization' => 'required|string|trim|min:2|max:150',
         ]);
+
+        if ((string) $data['password'] !== (string) $data['password_confirmation']) {
+            $this->fail('Validation failed.', 422, 'validation_error', [
+                'password_confirmation' => 'password_confirmation must match password',
+            ]);
+        }
 
         $email = strtolower((string) $data['email']);
 
@@ -37,17 +55,88 @@ final class AuthController extends Controller
             $this->fail('Email is already registered.', 409, 'email_taken');
         }
 
-        $user = User::create([
-            'name'          => trim((string) $data['name']),
-            'email'         => $email,
-            'password_hash' => AuthService::hashPassword((string) $data['password']),
-            'phone'         => $data['phone'] ?? null,
-            'department'    => $data['department'] ?? null,
-            'faculty'       => $data['faculty'] ?? null,
-            'specialization' => $data['specialization'] ?? null,
-            'role'          => 'student',
-            'status'        => 'pending',
-        ]);
+        if (User::query()->where('national_id', (string) $data['national_id'])->exists()) {
+            $this->fail('National ID is already registered.', 409, 'national_id_taken');
+        }
+
+        if ($request->file('id_front') === null || $request->file('id_back') === null) {
+            $this->fail('Validation failed.', 422, 'validation_error', [
+                'id_front' => $request->file('id_front') === null ? 'id_front is required' : null,
+                'id_back' => $request->file('id_back') === null ? 'id_back is required' : null,
+            ]);
+        }
+
+        /** @var User $user */
+        $user = null;
+        try {
+            $user = User::create([
+                'name'          => trim((string) $data['name']),
+                'email'         => $email,
+                'password_hash' => AuthService::hashPassword((string) $data['password']),
+                'phone'         => $data['phone'],
+                'national_id'   => $data['national_id'],
+                'department'    => $data['department'],
+                'faculty'       => $data['faculty'],
+                'specialization' => $data['specialization'],
+                'role'          => 'student',
+                'status'        => 'pending',
+            ]);
+
+            $request->setAttribute('user', $user);
+            $uploadService = $this->buildFileUploadService();
+            $context = new UploadContext(actorUserId: (int) $user->id);
+
+            $front = $uploadService->upload($request, new StudentIdFrontUpload(), $context);
+            $back  = $uploadService->upload($request, new StudentIdBackUpload(), $context);
+
+            Database::transaction(static function () use ($user, $front, $back): void {
+                UserIdentityPhoto::query()
+                    ->where('user_id', (int) $user->id)
+                    ->where('type', IdentityPhotoType::FRONT)
+                    ->where('is_active', 1)
+                    ->update(['is_active' => 0]);
+
+                UserIdentityPhoto::query()
+                    ->where('user_id', (int) $user->id)
+                    ->where('type', IdentityPhotoType::BACK)
+                    ->where('is_active', 1)
+                    ->update(['is_active' => 0]);
+
+                UserIdentityPhoto::create([
+                    'user_id'        => (int) $user->id,
+                    'type'           => IdentityPhotoType::FRONT,
+                    'file_id'        => $front->fileId,
+                    'file_path'      => $front->filePath,
+                    'file_url'       => $front->url,
+                    'original_name'  => $front->originalName,
+                    'size_bytes'     => $front->sizeBytes,
+                    'mime_type'      => $front->mimeType,
+                    'is_active'      => 1,
+                ]);
+
+                UserIdentityPhoto::create([
+                    'user_id'        => (int) $user->id,
+                    'type'           => IdentityPhotoType::BACK,
+                    'file_id'        => $back->fileId,
+                    'file_path'      => $back->filePath,
+                    'file_url'       => $back->url,
+                    'original_name'  => $back->originalName,
+                    'size_bytes'     => $back->sizeBytes,
+                    'mime_type'      => $back->mimeType,
+                    'is_active'      => 1,
+                ]);
+            });
+        } catch (UploadException $err) {
+            if ($user instanceof User) {
+                $user->delete();
+            }
+            $this->fail($err->getMessage(), $err->getStatus(), $err->getCodeString(), $err->getDetails());
+        } catch (\Throwable $err) {
+            if ($user instanceof User) {
+                $user->delete();
+            }
+            throw $err;
+        }
 
         $this->sendRegistrationPendingActivationEmail($user);
 
@@ -60,6 +149,14 @@ final class AuthController extends Controller
         $this->created([
             'user' => AuthService::buildSafeUser($user),
         ]);
+    }
+
+    private function buildFileUploadService(): FileUploadService
+    {
+        return new FileUploadService(
+            imageKitClient: new ImageKitClient(),
+            validator: new UploadedFileValidator(),
+        );
     }
 
     public function login(Request $request): never
@@ -76,7 +173,10 @@ final class AuthController extends Controller
 
         $email = strtolower((string) $data['email']);
 
-        $user = User::query()->where('email', $email)->first();
+        $user = User::query()
+            ->where('email', $email)
+            ->with('activeAvatar')
+            ->first();
         if ($user === null) {
             Logger::warning('Login failed: user not found', ['email' => $email]);
             $this->fail('Invalid credentials.', 401, 'invalid_credentials');
