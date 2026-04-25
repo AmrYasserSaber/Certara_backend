@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Core\Database;
 use App\Core\Request;
 use App\Core\Response;
+use App\Enums\NotificationType;
 use App\Helpers\NotificationService;
 use App\Models\SampleSize;
 
@@ -70,16 +71,16 @@ final class SampleSizeController extends Controller
         );
 
         if ($research === null) {
-            Response::json(['error' => 'البحث غير موجود'], 404);
+            Response::error('البحث غير موجود', 404, 'not_found');
         }
 
         if (($research['status'] ?? '') !== 'awaiting_sample_size') {
-            Response::json(['error' => 'لا يمكن تسجيل حجم العينة في الحالة الحالية'], 409);
+            Response::error('لا يمكن تسجيل حجم العينة في الحالة الحالية', 409, 'conflict');
         }
 
         $existing = SampleSize::findByResearch($researchId);
         if ($existing !== false) {
-            Response::json(['error' => 'تم تسجيل حجم العينة مسبقاً'], 409);
+            Response::error('تم تسجيل حجم العينة مسبقاً', 409, 'conflict');
         }
 
         $user = $request->user();
@@ -98,23 +99,26 @@ final class SampleSizeController extends Controller
                 return false;
             }
 
-            Database::execute(
+            $updated = Database::execute(
                 'UPDATE research SET status = ?, updated_at = NOW() WHERE id = ?',
                 ['awaiting_payment_2', $researchId]
             );
+            if (!$updated) {
+                throw new \RuntimeException('Failed to update research status.');
+            }
 
             return $created;
         });
 
         if ($sampleSize === false) {
-            Response::json(['error' => 'تعذر تسجيل حجم العينة حالياً'], 500);
+            Response::error('تعذر تسجيل حجم العينة حالياً', 500, 'server_error');
         }
 
         $studentId = (int) ($research['student_id'] ?? 0);
         if ($studentId > 0) {
             NotificationService::notify(
                 $studentId,
-                'REVIEW_REQUESTED',
+                NotificationType::SAMPLE_SIZE_SET,
                 'تم تحديد حجم العينة',
                 'يرجى إتمام الدفعة الثانية لمتابعة البحث',
                 $researchId
@@ -129,9 +133,6 @@ final class SampleSizeController extends Controller
 
     private function badRequest(array $details): never
     {
-        Response::json([
-            'error' => 'بيانات غير صالحة',
-            'details' => $details,
-        ], 400);
+        Response::error('بيانات غير صالحة', 400, 'validation_error', $details);
     }
 }

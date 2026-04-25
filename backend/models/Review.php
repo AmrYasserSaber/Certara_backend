@@ -38,13 +38,12 @@ final class Review
                     SELECT COUNT(*)
                     FROM review_comments rc
                     WHERE rc.review_id = rv.id
-                      AND rc.reviewer_id <> ?
-                ) AS unread_comment_count
+                ) AS comment_count
              FROM reviews rv
              INNER JOIN research r ON r.id = rv.research_id
              WHERE rv.reviewer_id = ?
              ORDER BY rv.created_at DESC',
-            [$reviewerId, $reviewerId]
+            [$reviewerId]
         );
     }
 

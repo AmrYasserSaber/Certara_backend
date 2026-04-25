@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Core\Database;
 use App\Core\Request;
 use App\Core\Response;
+use App\Enums\NotificationType;
 use App\Helpers\NotificationService;
 use App\Models\Review;
 use App\Models\ReviewComment;
@@ -34,7 +35,7 @@ final class ReviewController extends Controller
         $review = Review::findByResearchAndReviewer($researchId, $reviewerId);
 
         if ($review === false) {
-            Response::json(['error' => 'غير مصرح لك بهذا الإجراء'], 403);
+            Response::error('غير مصرح لك بهذا الإجراء', 403, 'forbidden');
         }
 
         $research = Database::fetchOne(
@@ -46,7 +47,7 @@ final class ReviewController extends Controller
         );
 
         if ($research === null) {
-            Response::json(['error' => 'البحث غير موجود'], 404);
+            Response::error('البحث غير موجود', 404, 'not_found');
         }
 
         $documents = Database::fetchAll(
@@ -85,7 +86,7 @@ final class ReviewController extends Controller
         $review = Review::findByResearchAndReviewer($researchId, $reviewerId);
 
         if ($review === false) {
-            Response::json(['error' => 'غير مصرح لك بهذا الإجراء'], 403);
+            Response::error('غير مصرح لك بهذا الإجراء', 403, 'forbidden');
         }
 
         $commentText = trim((string) ($request->input('comment_text') ?? ''));
@@ -110,7 +111,7 @@ final class ReviewController extends Controller
         ]);
 
         if ($comment === false) {
-            Response::json(['error' => 'تعذر إضافة التعليق حالياً'], 500);
+            Response::error('تعذر إضافة التعليق حالياً', 500, 'server_error');
         }
 
         if (($review['status'] ?? '') === 'assigned') {
@@ -134,11 +135,11 @@ final class ReviewController extends Controller
         $review = Review::findByResearchAndReviewer($researchId, $reviewerId);
 
         if ($review === false) {
-            Response::json(['error' => 'غير مصرح لك بهذا الإجراء'], 403);
+            Response::error('غير مصرح لك بهذا الإجراء', 403, 'forbidden');
         }
 
         if (($review['status'] ?? '') === 'decided') {
-            Response::json(['error' => 'تم تسجيل القرار مسبقاً'], 409);
+            Response::error('تم تسجيل القرار مسبقاً', 409, 'conflict');
         }
 
         $decision = (string) ($request->input('decision') ?? '');
@@ -169,7 +170,7 @@ final class ReviewController extends Controller
         );
 
         if ($research === null) {
-            Response::json(['error' => 'البحث غير موجود'], 404);
+            Response::error('البحث غير موجود', 404, 'not_found');
         }
 
         $researchStatus = match ($decision) {
@@ -179,49 +180,46 @@ final class ReviewController extends Controller
         };
 
         Database::transaction(function () use ($review, $decision, $researchStatus, $researchId, $reviewerId, $finalComment): void {
-            Review::updateDecision((int) $review['id'], $decision);
+            $decisionUpdated = Review::updateDecision((int) $review['id'], $decision);
+            if (!$decisionUpdated) {
+                throw new \RuntimeException('Failed to update review decision.');
+            }
 
-            Database::execute(
+            $researchUpdated = Database::execute(
                 'UPDATE research SET status = ?, updated_at = NOW() WHERE id = ?',
                 [$researchStatus, $researchId]
             );
+            if (!$researchUpdated) {
+                throw new \RuntimeException('Failed to update research status.');
+            }
 
             if ($finalComment !== '') {
-                ReviewComment::create([
+                $commentCreated = ReviewComment::create([
                     'review_id' => (int) $review['id'],
                     'reviewer_id' => $reviewerId,
                     'comment_text' => $finalComment,
                 ]);
+                if ($commentCreated === false) {
+                    throw new \RuntimeException('Failed to create final review comment.');
+                }
             }
         });
 
         $studentId = (int) ($research['student_id'] ?? 0);
         if ($studentId > 0) {
-            if ($decision === 'approved') {
-                NotificationService::notify(
-                    $studentId,
-                    'RESEARCH_APPROVED',
-                    'تمت الموافقة على البحث',
-                    'تمت مراجعة بحثك والموافقة عليه',
-                    $researchId
-                );
-            } elseif ($decision === 'rejected') {
-                NotificationService::notify(
-                    $studentId,
-                    'RESEARCH_REJECTED',
-                    'تم رفض البحث',
-                    'تم رفض بحثك. يرجى مراجعة التعليقات',
-                    $researchId
-                );
-            } else {
-                NotificationService::notify(
-                    $studentId,
-                    'REVISION_REQUESTED',
-                    'مطلوب تعديل البحث',
-                    'طلب المراجع إجراء تعديلات على بحثك',
-                    $researchId
-                );
-            }
+            $type = match ($decision) {
+                'approved' => NotificationType::RESEARCH_APPROVED,
+                'rejected' => NotificationType::RESEARCH_REJECTED,
+                'revision_requested' => NotificationType::REVISION_REQUESTED,
+            };
+
+            [$title, $message] = match ($decision) {
+                'approved' => ['تمت الموافقة على البحث', 'تمت مراجعة بحثك والموافقة عليه'],
+                'rejected' => ['تم رفض البحث', 'تم رفض بحثك. يرجى مراجعة التعليقات'],
+                'revision_requested' => ['مطلوب تعديل البحث', 'طلب المراجع إجراء تعديلات على بحثك'],
+            };
+
+            NotificationService::notify($studentId, $type, $title, $message, $researchId);
         }
 
         Response::json(['message' => 'تم تسجيل القرار بنجاح'], 200);
@@ -238,9 +236,6 @@ final class ReviewController extends Controller
 
     private function badRequest(array $details): never
     {
-        Response::json([
-            'error' => 'بيانات غير صالحة',
-            'details' => $details,
-        ], 400);
+        Response::error('بيانات غير صالحة', 400, 'validation_error', $details);
     }
 }
