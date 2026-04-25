@@ -47,7 +47,7 @@ final class ResearchController extends Controller
     {
         $id = (int) $request->param('id');
         $studentId = $request->user()->id;
-        $research = Research::where('student_id', $studentId)->find($id);
+        $research = Research::with('documents')->where('student_id', $studentId)->find($id);
 
         if (!$research) {
             $this->fail('Research not found.', 404, 'not_found');
