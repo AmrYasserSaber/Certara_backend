@@ -14,6 +14,7 @@ $router->post('/api/research',      [ResearchController::class, 'store'],  [Auth
 $router->get('/api/research',       [ResearchController::class, 'index'],  [AuthMiddleware::class]);
 $router->get('/api/research/{id}',  [ResearchController::class, 'show'],   [AuthMiddleware::class]);
 $router->put('/api/research/{id}',  [ResearchController::class, 'update'], [AuthMiddleware::class]);
+$router->patch('/api/research/{id}',  [ResearchController::class, 'update'], [AuthMiddleware::class]);
 
 // Payment routes
 $router->post('/api/research/{id}/payment',         [PaymentController::class, 'store'],  [AuthMiddleware::class]);
