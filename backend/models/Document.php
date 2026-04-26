@@ -16,9 +16,12 @@ final class Document extends Model
     protected $fillable = [
         'research_id',
         'type',
+        'file_id',
         'file_path',
+        'file_url',
         'original_name',
         'size_bytes',
+        'mime_type',
     ];
 
     protected $casts = [

@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Core\Request;
-use App\Enums\Roles;
 use App\Models\Research;
 use App\Models\Document;
 use App\Models\Review;
 use App\Helpers\UploadHelper;
+use App\Enums\Roles;
 use App\Enums\ResearchStatus;
+use App\Services\FileUploadService;
+use App\Services\ImageKitClient;
+use App\Services\UploadContext;
+use App\Services\UploadedFileValidator;
+use App\Services\UploadException;
+use App\Services\UploadStrategies\ResearchDocumentUpload;
 
 final class DocumentController extends Controller
 {
@@ -18,18 +24,14 @@ final class DocumentController extends Controller
     {
         $researchId = (int) $request->param('id');
         $studentId = $request->user()->id;
-
+        
         $research = Research::where('student_id', $studentId)->find($researchId);
         if (!$research) {
             $this->fail('Research not found.', 404, 'not_found');
         }
 
-        // We expect a 'type' for the document(s) - optional if user wants to specify it per request
-        // or we could expect an array of files where each might have a type.
-        // For simplicity and matching common patterns, we'll assume a single 'type' for this batch
-        // or default to 'protocol' if not provided.
         $type = $request->input('type', 'protocol');
-
+        
         $files = $_FILES['documents'] ?? null;
         if (!$files) {
             $this->fail('No documents uploaded.', 400, 'missing_files');
@@ -38,28 +40,33 @@ final class DocumentController extends Controller
         $uploadedDocuments = [];
         $errors = [];
 
-        // Normalize files array and use keys as types if they are provided as documents[type]
         $normalizedFiles = $this->normalizeFiles($files);
+        $uploadService = $this->buildFileUploadService();
+        $context = new UploadContext(actorUserId: $studentId, researchId: $researchId);
 
-        foreach ($normalizedFiles as $file) {
+        foreach ($normalizedFiles as $index => $file) {
             $fileType = $file['key'] ?? $type; // Use the key from FormData if available
-            $error = UploadHelper::validatePDF($file);
-            if ($error) {
-                $errors[] = "File {$index}: {$error}";
-                continue;
-            }
 
             try {
-                $directory = "uploads/documents/{$researchId}";
-                $path = UploadHelper::saveFile($file, $directory);
+                $result = $uploadService->uploadFromFileArray(
+                    request: $request,
+                    strategy: new ResearchDocumentUpload((string) $fileType),
+                    context: $context,
+                    file: $file,
+                );
 
                 $uploadedDocuments[] = Document::create([
                     'research_id'   => $researchId,
                     'type'          => $fileType,
-                    'file_path'     => $path,
-                    'original_name' => $file['name'],
-                    'size_bytes'    => $file['size'],
+                    'file_id'       => $result->fileId,
+                    'file_path'     => $result->filePath,
+                    'file_url'      => $result->url,
+                    'original_name' => $result->originalName,
+                    'size_bytes'    => $result->sizeBytes,
+                    'mime_type'     => $result->mimeType,
                 ]);
+            } catch (UploadException $err) {
+                $errors[] = "File {$index}: " . $err->getMessage();
             } catch (\Exception $e) {
                 $errors[] = "File {$index}: " . $e->getMessage();
             }
@@ -103,7 +110,7 @@ final class DocumentController extends Controller
     {
         $researchId = (int) $request->param('id');
         $docId = (int) $request->param('doc_id');
-        $studentId = $request->user()->id;
+        $studentId = (int) $request->user()->id;
 
         $research = Research::where('student_id', $studentId)->find($researchId);
         if (!$research) {
@@ -119,10 +126,64 @@ final class DocumentController extends Controller
             $this->fail('Document not found.', 404, 'not_found');
         }
 
-        UploadHelper::deleteFile($document->file_path);
+        $fileId = (string) ($document->file_id ?? '');
+        if ($fileId !== '') {
+            $client = new ImageKitClient();
+            $client->deleteByFileId($fileId, suppressExceptions: true);
+        } else {
+            UploadHelper::deleteFile((string) $document->file_path);
+        }
         $document->delete();
 
         $this->ok(['message' => 'Document deleted successfully.']);
+    }
+
+    public function signedUrl(Request $request): never
+    {
+        $researchId = (int) $request->param('id');
+        $docId = (int) $request->param('doc_id');
+        $user = $request->user();
+        $userId = (int) ($user->id ?? 0);
+        $role = (string) ($user->role ?? '');
+
+        if ($researchId <= 0 || $docId <= 0) {
+            $this->fail('Invalid research or document id.', 422, 'validation_error');
+        }
+
+        if ($userId <= 0 || $role === '') {
+            $this->fail('Unauthenticated.', 401, 'unauthenticated');
+        }
+
+        $document = Document::query()
+            ->where('research_id', $researchId)
+            ->find($docId);
+        if ($document === null) {
+            $this->fail('Document not found.', 404, 'not_found');
+        }
+
+        $this->assertCanAccessResearchDocuments(role: $role, userId: $userId, researchId: $researchId);
+
+        $filePath = (string) ($document->file_path ?? '');
+        if ($filePath === '') {
+            $this->fail('Document file path is missing.', 500, 'missing_file_path');
+        }
+
+        $expireSeconds = (int) env('IMAGEKIT_SIGNED_URL_EXPIRE_SECONDS', 300);
+        $client = new ImageKitClient();
+        try {
+            $signedUrl = $client->buildSignedUrl($filePath, $expireSeconds);
+        } catch (\Throwable $err) {
+            $this->fail('Could not generate signed URL.', 500, 'signed_url_failed', [
+                'reason' => $err->getMessage(),
+            ]);
+        }
+
+        $this->ok([
+            'documentId' => (int) $document->id,
+            'researchId' => $researchId,
+            'expiresIn' => $expireSeconds,
+            'url' => $signedUrl,
+        ]);
     }
 
     private function normalizeFiles(array $files): array
@@ -147,5 +208,37 @@ final class DocumentController extends Controller
         }
 
         return $normalized;
+    }
+
+    private function buildFileUploadService(): FileUploadService {
+        return new FileUploadService(
+            imageKitClient: new ImageKitClient(),
+            validator: new UploadedFileValidator(),
+        );
+    }
+
+    private function assertCanAccessResearchDocuments(string $role, int $userId, int $researchId): void
+    {
+        if (in_array($role, [Roles::ADMIN, Roles::MANAGER], true)) {
+            return;
+        }
+
+        if ($role === Roles::STUDENT) {
+            $research = Research::where('student_id', $userId)->find($researchId);
+            if ($research === null) {
+                $this->fail('Research not found.', 404, 'not_found');
+            }
+            return;
+        }
+
+        if ($role === Roles::REVIEWER) {
+            $review = Review::findByResearchAndReviewer($researchId, $userId);
+            if ($review === false) {
+                $this->fail('Forbidden.', 403, 'forbidden');
+            }
+            return;
+        }
+
+        $this->fail('Forbidden.', 403, 'forbidden');
     }
 }

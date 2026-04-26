@@ -106,9 +106,12 @@ CREATE TABLE `documents` (
                         'protocol','application','coi','checklist',
                         'pi_consent','patient_consent','photos_biopsies_consent'
                     ) NOT NULL,
+    `file_id`       VARCHAR(64)     NULL,
     `file_path`     VARCHAR(255)    NOT NULL,
+    `file_url`      VARCHAR(500)    NULL,
     `original_name` VARCHAR(255)    NOT NULL,
     `size_bytes`    INT UNSIGNED    NULL,
+    `mime_type`     VARCHAR(100)    NULL,
     `uploaded_at`   TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_documents_research`      (`research_id`),

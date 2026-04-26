@@ -69,6 +69,64 @@ final class FileUploadService
         );
     }
 
+    /**
+     * Upload a single file represented as a PHP `$_FILES`-style array.
+     *
+     * @param array<string,mixed> $file
+     */
+    public function uploadFromFileArray(Request $request, UploadableFile $strategy, UploadContext $context, array $file): UploadedFileResult {
+        $startedAt = microtime(true);
+        $this->assertAuthorized($request, $strategy, $context);
+
+        $fieldName = $strategy->getFileFieldName();
+        $uploadedFile = $this->validator->createUploadedFile($fieldName, $file);
+        $validation = $this->validator->validateUploadedFile($uploadedFile, $strategy);
+
+        $payload = $this->buildUploadPayload($strategy, $context, $uploadedFile);
+        $stream = $payload['file'] ?? null;
+        $uploadStartedAt = microtime(true);
+        try {
+            $result = $this->imageKitClient->upload($payload);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+
+        $fileId = (string) ($result['fileId'] ?? '');
+        $filePath = (string) ($result['filePath'] ?? '');
+        $url = (string) ($result['url'] ?? '');
+        if ($fileId === '' || $filePath === '' || $url === '') {
+            Logger::error('ImageKit upload missing required fields', [
+                'result' => $result,
+            ]);
+            throw new \RuntimeException('Upload failed.');
+        }
+
+        Logger::info('File uploaded to ImageKit', [
+            'actor_user_id' => $context->actorUserId,
+            'category' => $strategy->getCategory(),
+            'file_id' => $fileId,
+            'file_path' => $filePath,
+            'size_bytes' => $uploadedFile->sizeBytes,
+            'mime_type' => $validation['mimeType'],
+            'is_sensitive' => $strategy->isSensitive(),
+            'timings_ms' => [
+                'upload' => (int) round((microtime(true) - $uploadStartedAt) * 1000),
+                'total' => (int) round((microtime(true) - $startedAt) * 1000),
+            ],
+        ]);
+
+        return new UploadedFileResult(
+            fileId: $fileId,
+            filePath: $filePath,
+            url: $url,
+            originalName: $uploadedFile->originalName,
+            sizeBytes: $uploadedFile->sizeBytes,
+            mimeType: (string) $validation['mimeType'],
+        );
+    }
+
     private function assertAuthorized(Request $request, UploadableFile $strategy, UploadContext $context): void {
         $user = $request->user();
         if (!$user instanceof User) {

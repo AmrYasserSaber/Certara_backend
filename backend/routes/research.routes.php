@@ -24,4 +24,5 @@ $router->post('/api/research/payment/{payment_id}/success', [PaymentController::
 // Document routes
 $router->post('/api/research/{id}/documents',           [DocumentController::class, 'store'],   [AuthMiddleware::class]);
 $router->get('/api/research/{id}/documents',            [DocumentController::class, 'index'],   [AuthMiddleware::class]);
+$router->get('/api/research/{id}/documents/{doc_id}/signed-url', [DocumentController::class, 'signedUrl'], [AuthMiddleware::class]);
 $router->delete('/api/research/{id}/documents/{doc_id}', [DocumentController::class, 'destroy'], [AuthMiddleware::class]);
