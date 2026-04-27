@@ -21,11 +21,11 @@ final class DocumentController extends Controller
 
         $research = Research::where('student_id', $studentId)->find($researchId);
         if (!$research) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         if (!in_array((string) $research->status, [ResearchStatus::DRAFT, ResearchStatus::REVISION_REQUESTED], true)) {
-            $this->fail('Documents can only be updated in DRAFT or REVISION_REQUESTED status.', 403, 'forbidden');
+            $this->fail('لا يمكن تحديث المستندات إلا في حالة "مسودة" أو "طلب مراجعة.', 403, 'forbidden');
         }
 
         // We expect a 'type' for the document(s) - optional if user wants to specify it per request
@@ -36,7 +36,7 @@ final class DocumentController extends Controller
 
         $files = $_FILES['documents'] ?? null;
         if (!$files) {
-            $this->fail('No documents uploaded.', 400, 'missing_files');
+            $this->fail('لم يتم رفع أي مستندات.', 400, 'missing_files');
         }
 
         $uploadedDocuments = [];
@@ -65,7 +65,7 @@ final class DocumentController extends Controller
                 if ($existingDoc) {
                     // Delete the old file
                     UploadHelper::deleteFile($existingDoc->file_path);
-                    
+
                     // Update existing record
                     $existingDoc->update([
                         'file_path'     => $path,
@@ -89,7 +89,7 @@ final class DocumentController extends Controller
         }
 
         if ($errors !== [] && $uploadedDocuments === []) {
-            $this->fail('Upload failed.', 422, 'upload_error', $errors);
+            $this->fail('فشل الرفع.', 422, 'upload_error', $errors);
         }
 
         // Auto-submit logic: Check if all 4 required documents exist
@@ -127,7 +127,7 @@ final class DocumentController extends Controller
             $review = Review::findByResearchAndReviewer($researchId, $userId);
             $latest = Review::findLatestByResearch($researchId);
             if ($review === false || $latest === false || (int) $latest['id'] !== (int) $review['id']) {
-                $this->fail('Research not found.', 404, 'not_found');
+                $this->fail('البحث غير موجود.', 404, 'not_found');
             }
 
             $research = Research::find($researchId);
@@ -136,7 +136,7 @@ final class DocumentController extends Controller
         }
 
         if (!$research) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         $this->ok($research->documents);
@@ -150,22 +150,22 @@ final class DocumentController extends Controller
 
         $research = Research::where('student_id', $studentId)->find($researchId);
         if (!$research) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         if (!in_array((string) $research->status, [ResearchStatus::DRAFT, ResearchStatus::REVISION_REQUESTED], true)) {
-            $this->fail('Documents can only be deleted in DRAFT or REVISION_REQUESTED status.', 403, 'forbidden');
+            $this->fail('يمكن حذف المستندات فقط إذا كان البحث في حالة مسودة.', 403, 'forbidden');
         }
 
         $document = Document::where('research_id', $researchId)->find($docId);
         if (!$document) {
-            $this->fail('Document not found.', 404, 'not_found');
+            $this->fail('المستند غير موجود.', 404, 'not_found');
         }
 
         UploadHelper::deleteFile($document->file_path);
         $document->delete();
 
-        $this->ok(['message' => 'Document deleted successfully.']);
+        $this->ok(['message' => 'تم حذف المستند بنجاح.']);
     }
 
     private function normalizeFiles(array $files): array

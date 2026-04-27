@@ -17,6 +17,7 @@ $middleware = [
 ];
 
 $router->get('/api/manager/research/reviewed', [ManagerController::class, 'reviewedQueue'], $middleware);
+$router->get('/api/manager/certificates', [ManagerController::class, 'getApprovedCertificates'], $middleware);
 $router->get('/api/manager/research/{id}', [ManagerController::class, 'researchDetail'], $middleware);
 $router->put('/api/manager/research/{id}/decision', [ManagerController::class, 'decision'], $middleware);
 $router->get('/api/manager/dashboard/stats', [ManagerController::class, 'stats'], $middleware);

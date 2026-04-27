@@ -24,13 +24,13 @@ final class PaymentController extends Controller
         $research = Research::find($researchId);
 
         if (!$research) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         $type = (string) $request->input('type');
 
         if (!in_array($type, PaymentType::ALL, true)) {
-            $this->fail('Invalid payment type.', 400, 'invalid_type');
+            $this->fail('طريقة دفع غير صالحة.', 400, 'invalid_type');
         }
 
         if ($type === PaymentType::SECOND) {
@@ -39,7 +39,7 @@ final class PaymentController extends Controller
                 ->where('status', PaymentStatus::PAID)
                 ->exists();
             if (!$isFirstPaid) {
-                $this->fail('First payment must be completed before paying the second.', 409, 'invalid_state');
+                $this->fail('يجب إتمام الدفعة الأولى قبل دفع الدفعة الثانية.', 409, 'invalid_state');
             }
         }
 
@@ -56,14 +56,15 @@ final class PaymentController extends Controller
                 ->first();
 
             if (!$latest) {
-                $this->fail('Payment is not prepared by admin yet.', 409, 'invalid_state');
-            }
+                $this->fail('
+لم يتم تجهيز رابط الدفع من قبل الإدارة بعد.', 409, 'invalid_state');
+           }
 
             if ($latest->status === PaymentStatus::PAID) {
-                $this->fail('Payment for this stage has already been completed.', 409, 'already_paid');
+                $this->fail('هذه العملية تمت مسبقا.', 409, 'already_paid');
             }
 
-            $this->fail('Payment is not actionable. Please contact admin to regenerate it.', 409, 'invalid_state');
+            $this->fail('الدفع غير قابل للتنفيذ. يرجى الاتصال بالمسؤول لتجديده.', 409, 'invalid_state');
         }
 
         $merchantRefNum = (string) ($payment->gateway_ref ?? '');
@@ -310,7 +311,7 @@ final class PaymentController extends Controller
         $research = Research::find($researchId);
 
         if (!$research) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         $payments = Payment::where('research_id', $researchId)
@@ -318,7 +319,7 @@ final class PaymentController extends Controller
             ->get();
 
         if ($payments->isEmpty()) {
-            $this->fail('No completed payments found for this research.', 404, 'not_found');
+            $this->fail('لم يتم العثور على دفعات مكتملة لهذا البحث.', 404, 'not_found');
         }
 
         $sampleSize = SampleSize::findByResearch($researchId);

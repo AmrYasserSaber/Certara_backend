@@ -43,8 +43,8 @@ final class AuthController extends Controller
         ]);
 
         if ((string) $data['password'] !== (string) $data['password_confirmation']) {
-            $this->fail('Validation failed.', 422, 'validation_error', [
-                'password_confirmation' => 'password_confirmation must match password',
+            $this->fail('فشل التحقق.', 422, 'validation_error', [
+                'password_confirmation' => 'يجب أن يتطابق تأكيد كلمة المرور مع كلمة المرور',
             ]);
         }
 
@@ -52,17 +52,17 @@ final class AuthController extends Controller
 
         if (User::query()->where('email', $email)->exists()) {
             Logger::warning('Register blocked: email exists', ['email' => $email]);
-            $this->fail('Email is already registered.', 409, 'email_taken');
+            $this->fail('البريد الإلكتروني مسجل بالفعل.', 409, 'email_taken');
         }
 
         if (User::query()->where('national_id', (string) $data['national_id'])->exists()) {
-            $this->fail('National ID is already registered.', 409, 'national_id_taken');
+            $this->fail('رقم الهوية مسجل بالفعل.', 409, 'national_id_taken');
         }
 
         if ($request->file('id_front') === null || $request->file('id_back') === null) {
-            $this->fail('Validation failed.', 422, 'validation_error', [
-                'id_front' => $request->file('id_front') === null ? 'id_front is required' : null,
-                'id_back' => $request->file('id_back') === null ? 'id_back is required' : null,
+            $this->fail('فشل التحقق.', 422, 'validation_error', [
+                'id_front' => $request->file('id_front') === null ? 'صورة الهوية الأمامية مطلوبة' : null,
+                'id_back' => $request->file('id_back') === null ? 'صورة الهوية الخلفية مطلوبة' : null,
             ]);
         }
 
@@ -179,7 +179,7 @@ final class AuthController extends Controller
             ->first();
         if ($user === null) {
             Logger::warning('Login failed: user not found', ['email' => $email]);
-            $this->fail('Invalid credentials.', 401, 'invalid_credentials');
+            $this->fail('بيانات الاعتماد غير صالحة.', 401, 'invalid_credentials');
         }
 
         if ((string) ($user->status ?? '') !== 'active') {
@@ -188,7 +188,7 @@ final class AuthController extends Controller
                 'email' => (string) $user->email,
                 'status' => (string) $user->status,
             ]);
-            $this->fail('Account is not active.', 403, 'account_inactive');
+            $this->fail('الحساب غير نشط.', 403, 'account_inactive');
         }
 
         if (!AuthService::verifyPassword((string) $data['password'], (string) $user->password_hash)) {
@@ -196,7 +196,7 @@ final class AuthController extends Controller
                 'user_id' => (int) $user->id,
                 'email' => (string) $user->email,
             ]);
-            $this->fail('Invalid credentials.', 401, 'invalid_credentials');
+            $this->fail('بيانات الاعتماد غير صالحة.', 401, 'invalid_credentials');
         }
 
         AuthService::loginUser($user);
@@ -249,7 +249,7 @@ final class AuthController extends Controller
     {
         $user = $request->user();
         if (!$user instanceof User) {
-            $this->fail('Unauthenticated.', 401, 'unauthenticated');
+            $this->fail('غير مصرح بالدخول.', 401, 'unauthenticated');
         }
 
         $this->ok(['user' => AuthService::buildSafeUser($user)]);
@@ -259,7 +259,7 @@ final class AuthController extends Controller
     {
         $user = $request->user();
         if (!$user instanceof User) {
-            $this->fail('Unauthenticated.', 401, 'unauthenticated');
+            $this->fail('غير مصرح بالدخول.', 401, 'unauthenticated');
         }
 
         $this->ok([
@@ -275,26 +275,26 @@ final class AuthController extends Controller
             return;
         }
 
-        $subject = 'Your account was created (activation pending)';
+        $subject = 'تم إنشاء حسابك (في انتظار التفعيل)';
         $name = htmlspecialchars((string) ($user->name ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
         $body = <<<HTML
 <!doctype html>
-<html lang="en">
-  <body style="font-family: Tahoma, Arial, sans-serif; background:#f6f6f6; padding:20px;">
+<html lang="ar" dir="rtl">
+  <body style="font-family: Tahoma, Arial, sans-serif; background:#f6f6f6; padding:20px; text-align: right;">
     <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;padding:24px;">
-      <h2 style="color:#0b3d91;margin:0 0 16px;">Welcome{$this->renderNameSuffix($name)}</h2>
+      <h2 style="color:#0b3d91;margin:0 0 16px;">مرحباً{$this->renderNameSuffix($name)}</h2>
       <p style="line-height:1.7;color:#333;margin:0 0 12px;">
-        Your student account has been created successfully.
+        لقد تم إنشاء حساب الطالب الخاص بك بنجاح.
       </p>
       <p style="line-height:1.7;color:#333;margin:0 0 12px;">
-        Your account still needs to be activated by the administration before you can sign in.
+        لا يزال حسابك بحاجة إلى التفعيل من قبل الإدارة قبل أن تتمكن من تسجيل الدخول.
       </p>
       <p style="line-height:1.7;color:#333;margin:0 0 12px;">
-        You will receive another email once your account is activated.
+        ستتلقى رسالة بريد إلكتروني أخرى بمجرد تفعيل حسابك.
       </p>
       <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-      <p style="color:#888;font-size:12px;margin:0;">IRB Digital System — automated email.</p>
+      <p style="color:#888;font-size:12px;margin:0;">نظام IRB الرقمي - بريد إلكتروني تلقائي.</p>
     </div>
   </body>
 </html>

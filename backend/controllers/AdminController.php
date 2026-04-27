@@ -61,20 +61,20 @@ final class AdminController extends Controller
         $id = (int) $request->param('id');
 
         if ($id <= 0) {
-            $this->fail('Invalid user id.', 422, 'validation_error');
+            $this->fail('معرف المستخدم غير صالح.', 422, 'validation_error');
         }
 
         $user = User::find($id);
         if ($user === null) {
-            $this->fail('User not found.', 404, 'not_found');
+            $this->fail('المستخدم غير موجود.', 404, 'not_found');
         }
 
         if ((string) ($user->status ?? '') === 'active') {
-            $this->fail('User is already active.', 409, 'already_active');
+            $this->fail('المستخدم نشط بالفعل.', 409, 'already_active');
         }
 
         if ((string) ($user->status ?? '') !== 'pending') {
-            $this->fail('Only pending users can be activated.', 409, 'invalid_state');
+            $this->fail('يمكن تفعيل المستخدمين المعلقين فقط.', 409, 'invalid_state');
         }
 
         Database::execute('UPDATE users SET status = ? WHERE id = ? AND status = ?', ['active', $id, 'pending']);
@@ -111,20 +111,20 @@ final class AdminController extends Controller
         $reason = (string) ($data['reason'] ?? '');
 
         if ($id <= 0) {
-            $this->fail('Invalid user id.', 422, 'validation_error');
+            $this->fail('معرف المستخدم غير صالح.', 422, 'validation_error');
         }
 
         $user = User::find($id);
         if ($user === null) {
-            $this->fail('User not found.', 404, 'not_found');
+            $this->fail('المستخدم غير موجود.', 404, 'not_found');
         }
 
         if ((string) ($user->status ?? '') === 'rejected') {
-            $this->fail('User is already rejected.', 409, 'already_rejected');
+            $this->fail('تم رفض المستخدم بالفعل.', 409, 'already_rejected');
         }
 
         if ((string) ($user->status ?? '') !== 'pending') {
-            $this->fail('Only pending users can be rejected.', 409, 'invalid_state');
+            $this->fail('يمكن رفض المستخدمين المعلقين فقط.', 409, 'invalid_state');
         }
 
         Database::execute('UPDATE users SET status = ? WHERE id = ?', ['rejected', $id]);
@@ -195,12 +195,12 @@ final class AdminController extends Controller
     {
         $id = (int) $request->param('id');
         if ($id <= 0) {
-            $this->fail('Invalid research id.', 422, 'validation_error');
+            $this->fail('معرف البحث غير صالح.', 422, 'validation_error');
         }
 
         $research = $this->loadResearchDetail($id);
         if ($research === null) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         $this->ok(['research' => $research]);
@@ -216,12 +216,12 @@ final class AdminController extends Controller
         $reviewerId = (int) $data['reviewer_id'];
 
         if ($id <= 0 || $reviewerId <= 0) {
-            $this->fail('Invalid research or reviewer id.', 422, 'validation_error');
+            $this->fail('معرف البحث أو المراجع غير صالح.', 422, 'validation_error');
         }
 
         $research = $this->loadResearchDetail($id);
         if ($research === null) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         $reviewer = User::query()
@@ -231,7 +231,7 @@ final class AdminController extends Controller
             ->first();
 
         if ($reviewer === null) {
-            $this->fail('Reviewer not found.', 404, 'not_found');
+            $this->fail('المراجع غير موجود.', 404, 'not_found');
         }
 
         Database::transaction(function () use ($id, $reviewerId): void {
@@ -302,16 +302,16 @@ final class AdminController extends Controller
         $amount = (float) $data['amount'];
 
         if ($id <= 0) {
-            $this->fail('Invalid research id.', 422, 'validation_error');
+            $this->fail('معرف البحث غير صالح.', 422, 'validation_error');
         }
 
         $research = Database::fetchOne('SELECT * FROM research WHERE id = ?', [$id]);
         if ($research === null) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         if ((string) $research['status'] !== 'pending_activation') {
-            $this->fail('Serial numbers can only be generated for newly activated research.', 409, 'invalid_state');
+            $this->fail('يمكن إنشاء الأرقام التسلسلية فقط للأبحاث التي تم تفعيلها حديثاً.', 409, 'invalid_state');
         }
 
         if (!empty($research['serial_number'])) {

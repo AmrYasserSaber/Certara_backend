@@ -38,7 +38,7 @@ final class NotificationController extends Controller
         $id   = (int) $request->param('id');
 
         if ($id <= 0) {
-            $this->fail('Invalid notification id.', 422, 'validation_error');
+            $this->fail('معرف التنبيه غير صالح.', 422, 'validation_error');
         }
 
         $changed = Notification::markRead($id, (int) $user->id);
@@ -47,7 +47,7 @@ final class NotificationController extends Controller
                 'user_id' => (int) $user->id,
                 'notification_id' => $id,
             ]);
-            $this->fail('Notification not found.', 404, 'not_found');
+            $this->fail('التنبيه غير موجود.', 404, 'not_found');
         }
 
         Logger::info('Notification marked as read', [
