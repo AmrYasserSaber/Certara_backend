@@ -25,6 +25,11 @@ $router->get('/api/reviews/assigned', [ReviewController::class, 'assigned'], [
     new RoleMiddleware(['reviewer']),
 ]);
 
+$router->get('/api/reviews/archived', [ReviewController::class, 'archived'], [
+    AuthMiddleware::class,
+    new RoleMiddleware(['reviewer']),
+]);
+
 $router->get('/api/reviews/{research_id}', [ReviewController::class, 'show'], [
     AuthMiddleware::class,
     new RoleMiddleware(['reviewer']),

@@ -24,6 +24,10 @@ final class DocumentController extends Controller
             $this->fail('Research not found.', 404, 'not_found');
         }
 
+        if (!in_array((string) $research->status, [ResearchStatus::DRAFT, ResearchStatus::REVISION_REQUESTED], true)) {
+            $this->fail('Documents can only be updated in DRAFT or REVISION_REQUESTED status.', 403, 'forbidden');
+        }
+
         // We expect a 'type' for the document(s) - optional if user wants to specify it per request
         // or we could expect an array of files where each might have a type.
         // For simplicity and matching common patterns, we'll assume a single 'type' for this batch
@@ -121,7 +125,8 @@ final class DocumentController extends Controller
 
         if ($role === Roles::REVIEWER) {
             $review = Review::findByResearchAndReviewer($researchId, $userId);
-            if ($review === false) {
+            $latest = Review::findLatestByResearch($researchId);
+            if ($review === false || $latest === false || (int) $latest['id'] !== (int) $review['id']) {
                 $this->fail('Research not found.', 404, 'not_found');
             }
 
@@ -148,8 +153,8 @@ final class DocumentController extends Controller
             $this->fail('Research not found.', 404, 'not_found');
         }
 
-        if ($research->status !== ResearchStatus::DRAFT) {
-            $this->fail('Documents can only be deleted if the research is in DRAFT status.', 403, 'forbidden');
+        if (!in_array((string) $research->status, [ResearchStatus::DRAFT, ResearchStatus::REVISION_REQUESTED], true)) {
+            $this->fail('Documents can only be deleted in DRAFT or REVISION_REQUESTED status.', 403, 'forbidden');
         }
 
         $document = Document::where('research_id', $researchId)->find($docId);

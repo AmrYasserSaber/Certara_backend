@@ -17,7 +17,17 @@ final class ReviewController extends Controller
     public function assigned(Request $request): never
     {
         $reviewerId = (int) ($request->user()->id ?? 0);
-        $rows = Review::findByReviewer($reviewerId);
+        $rows = Review::findActiveLatestByReviewer($reviewerId);
+
+        $data = array_map(fn (array $row): array => $this->stripStudentPII($row), $rows);
+
+        Response::json(['data' => $data], 200);
+    }
+
+    public function archived(Request $request): never
+    {
+        $reviewerId = (int) ($request->user()->id ?? 0);
+        $rows = Review::findArchivedLatestByReviewer($reviewerId);
 
         $data = array_map(fn (array $row): array => $this->stripStudentPII($row), $rows);
 
@@ -32,9 +42,11 @@ final class ReviewController extends Controller
         }
 
         $reviewerId = (int) ($request->user()->id ?? 0);
+        $includeHistory = (string) ($request->query('include_history') ?? '') === '1';
         $review = Review::findByResearchAndReviewer($researchId, $reviewerId);
+        $latest = Review::findLatestByResearch($researchId);
 
-        if ($review === false) {
+        if ($review === false || $latest === false || (int) $latest['id'] !== (int) $review['id']) {
             Response::error('غير مصرح لك بهذا الإجراء', 403, 'forbidden');
         }
 
@@ -59,12 +71,67 @@ final class ReviewController extends Controller
         );
 
         $comments = ReviewComment::findByReview((int) $review['id']);
+        $reviewRounds = [];
+
+        if ($includeHistory) {
+            $roundRows = Database::fetchAll(
+                'SELECT rv.id, rv.reviewer_id, u.name AS reviewer_name, rv.round_number, rv.previous_review_id, rv.status, rv.decision, rv.decided_at, rv.created_at
+                 FROM reviews rv
+                 JOIN users u ON u.id = rv.reviewer_id
+                 WHERE rv.research_id = ?
+                 ORDER BY rv.round_number ASC, rv.id ASC',
+                [$researchId]
+            );
+
+            $reviewIds = array_values(array_filter(array_map(
+                static fn (array $row): int => (int) ($row['id'] ?? 0),
+                $roundRows
+            ), static fn (int $value): bool => $value > 0));
+
+            $commentRows = $reviewIds !== []
+                ? Database::fetchAll(
+                    'SELECT id, review_id, reviewer_id, comment_text, created_at
+                     FROM review_comments
+                     WHERE review_id IN (' . implode(',', array_fill(0, count($reviewIds), '?')) . ')
+                     ORDER BY created_at ASC, id ASC',
+                    $reviewIds
+                )
+                : [];
+
+            $commentsByReviewId = [];
+            foreach ($commentRows as $row) {
+                $reviewId = (int) ($row['review_id'] ?? 0);
+                if (!isset($commentsByReviewId[$reviewId])) {
+                    $commentsByReviewId[$reviewId] = [];
+                }
+                $commentsByReviewId[$reviewId][] = $row;
+            }
+
+            $reviewRounds = array_map(static function (array $row) use ($commentsByReviewId): array {
+                $reviewId = (int) ($row['id'] ?? 0);
+                return [
+                    'id' => $reviewId,
+                    'round_number' => (int) ($row['round_number'] ?? 0),
+                    'previous_review_id' => isset($row['previous_review_id']) ? (int) $row['previous_review_id'] : null,
+                    'status' => $row['status'] ?? null,
+                    'decision' => $row['decision'] ?? null,
+                    'decided_at' => $row['decided_at'] ?? null,
+                    'created_at' => $row['created_at'] ?? null,
+                    'reviewer' => [
+                        'id' => (int) ($row['reviewer_id'] ?? 0),
+                        'name' => $row['reviewer_name'] ?? null,
+                    ],
+                    'comments' => $commentsByReviewId[$reviewId] ?? [],
+                ];
+            }, $roundRows);
+        }
 
         Response::json([
             'data' => [
                 'research' => $this->stripStudentPII($research),
                 'documents' => $documents,
                 'comments' => $comments,
+                'review_rounds' => $reviewRounds,
                 'review' => [
                     'id' => (int) $review['id'],
                     'status' => $review['status'],
@@ -84,8 +151,9 @@ final class ReviewController extends Controller
 
         $reviewerId = (int) ($request->user()->id ?? 0);
         $review = Review::findByResearchAndReviewer($researchId, $reviewerId);
+        $latest = Review::findLatestByResearch($researchId);
 
-        if ($review === false) {
+        if ($review === false || $latest === false || (int) $latest['id'] !== (int) $review['id']) {
             Response::error('غير مصرح لك بهذا الإجراء', 403, 'forbidden');
         }
 
@@ -133,8 +201,9 @@ final class ReviewController extends Controller
 
         $reviewerId = (int) ($request->user()->id ?? 0);
         $review = Review::findByResearchAndReviewer($researchId, $reviewerId);
+        $latest = Review::findLatestByResearch($researchId);
 
-        if ($review === false) {
+        if ($review === false || $latest === false || (int) $latest['id'] !== (int) $review['id']) {
             Response::error('غير مصرح لك بهذا الإجراء', 403, 'forbidden');
         }
 

@@ -168,6 +168,8 @@ CREATE TABLE `reviews` (
     `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `research_id` BIGINT UNSIGNED NOT NULL,
     `reviewer_id` BIGINT UNSIGNED NOT NULL,
+    `round_number` INT UNSIGNED    NOT NULL,
+    `previous_review_id` BIGINT UNSIGNED NULL,
     `status`      ENUM('assigned','in_progress','decided') NOT NULL DEFAULT 'assigned',
     `decision`    ENUM('approved','rejected','revision_requested') NULL,
     `decided_at`  TIMESTAMP       NULL DEFAULT NULL,
@@ -177,11 +179,14 @@ CREATE TABLE `reviews` (
     PRIMARY KEY (`id`),
     KEY `idx_reviews_research` (`research_id`),
     KEY `idx_reviews_reviewer` (`reviewer_id`),
-    UNIQUE KEY `uq_reviews_research_reviewer` (`research_id`, `reviewer_id`),
+    KEY `idx_reviews_research_reviewer_round` (`research_id`, `reviewer_id`, `round_number`),
+    UNIQUE KEY `uq_reviews_research_round` (`research_id`, `round_number`),
     CONSTRAINT `fk_reviews_research`
         FOREIGN KEY (`research_id`) REFERENCES `research` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_reviews_reviewer`
-        FOREIGN KEY (`reviewer_id`) REFERENCES `users` (`id`)    ON DELETE RESTRICT
+        FOREIGN KEY (`reviewer_id`) REFERENCES `users` (`id`)    ON DELETE RESTRICT,
+    CONSTRAINT `fk_reviews_previous_review`
+        FOREIGN KEY (`previous_review_id`) REFERENCES `reviews` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- review_comments ----------------------------------------------------------

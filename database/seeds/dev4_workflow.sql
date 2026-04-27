@@ -325,15 +325,17 @@ INSERT INTO `reviews` (
         `id`,
         `research_id`,
         `reviewer_id`,
+        `round_number`,
+        `previous_review_id`,
         `status`,
         `decision`,
         `decided_at`
     )
-VALUES (4001, 102, 4, 'in_progress', NULL, NULL),
-    (4002, 103, 4, 'decided', 'approved', NOW()),
-    (4003, 104, 4, 'decided', 'approved', NOW()),
-    (4004, 105, 4, 'decided', 'rejected', NOW()),
-    (4005, 107, 4, 'decided', 'approved', NOW());
+VALUES (4001, 102, 4, 1, NULL, 'in_progress', NULL, NULL),
+    (4002, 103, 4, 1, NULL, 'decided', 'approved', NOW()),
+    (4003, 104, 4, 1, NULL, 'decided', 'approved', NOW()),
+    (4004, 105, 4, 1, NULL, 'decided', 'rejected', NOW()),
+    (4005, 107, 4, 1, NULL, 'decided', 'approved', NOW());
 INSERT INTO `review_comments` (`id`, `review_id`, `reviewer_id`, `comment_text`)
 VALUES (
         5001,

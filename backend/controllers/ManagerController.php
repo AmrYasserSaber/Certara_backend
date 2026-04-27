@@ -253,7 +253,7 @@ final class ManagerController extends Controller
                     u.name AS student_name, u.email AS student_email,
                     ss.calculated_size AS sample_calculated_size, ss.notes AS sample_notes, ss.fee_amount AS sample_fee_amount, ss.created_at AS sample_created_at,
                     so.id AS sample_officer_id, so.name AS sample_officer_name,
-                    rev.id AS review_id, rev.reviewer_id, rv.name AS reviewer_name, rev.status AS review_status, rev.decision AS review_decision, rev.decided_at AS review_decided_at,
+                    rev.id AS review_id, rev.reviewer_id, rev.round_number AS review_round_number, rev.previous_review_id AS review_previous_review_id, rv.name AS reviewer_name, rev.status AS review_status, rev.decision AS review_decision, rev.decided_at AS review_decided_at,
                     c.id AS certificate_id, c.certificate_number, c.file_path AS certificate_file_path, c.issued_at AS certificate_issued_at
              FROM research r
              JOIN users u ON u.id = r.student_id
@@ -263,10 +263,10 @@ final class ManagerController extends Controller
                 SELECT rr.*
                 FROM reviews rr
                 INNER JOIN (
-                    SELECT research_id, MAX(id) AS max_id
+                    SELECT research_id, MAX(round_number) AS max_round_number
                     FROM reviews
                     GROUP BY research_id
-                ) latest ON latest.max_id = rr.id
+                ) latest ON latest.research_id = rr.research_id AND latest.max_round_number = rr.round_number
              ) rev ON rev.research_id = r.id
              LEFT JOIN users rv ON rv.id = rev.reviewer_id
              LEFT JOIN certificates c ON c.research_id = r.id
@@ -295,7 +295,7 @@ final class ManagerController extends Controller
                     u.name AS student_name, u.email AS student_email, u.phone AS student_phone, u.department AS student_department, u.faculty AS student_faculty, u.specialization AS student_specialization,
                     ss.calculated_size AS sample_calculated_size, ss.notes AS sample_notes, ss.fee_amount AS sample_fee_amount, ss.created_at AS sample_created_at,
                     so.id AS sample_officer_id, so.name AS sample_officer_name, so.email AS sample_officer_email,
-                    rev.id AS review_id, rev.reviewer_id, rv.name AS reviewer_name, rv.email AS reviewer_email, rev.status AS review_status, rev.decision AS review_decision, rev.decided_at AS review_decided_at,
+                    rev.id AS review_id, rev.reviewer_id, rev.round_number AS review_round_number, rev.previous_review_id AS review_previous_review_id, rv.name AS reviewer_name, rv.email AS reviewer_email, rev.status AS review_status, rev.decision AS review_decision, rev.decided_at AS review_decided_at,
                     c.id AS certificate_id, c.certificate_number, c.file_path AS certificate_file_path, c.issued_at AS certificate_issued_at,
                     p.first_payment_status, p.second_payment_status
              FROM research r
@@ -306,10 +306,10 @@ final class ManagerController extends Controller
                 SELECT rr.*
                 FROM reviews rr
                 INNER JOIN (
-                    SELECT research_id, MAX(id) AS max_id
+                    SELECT research_id, MAX(round_number) AS max_round_number
                     FROM reviews
                     GROUP BY research_id
-                ) latest ON latest.max_id = rr.id
+                ) latest ON latest.research_id = rr.research_id AND latest.max_round_number = rr.round_number
              ) rev ON rev.research_id = r.id
              LEFT JOIN users rv ON rv.id = rev.reviewer_id
              LEFT JOIN certificates c ON c.research_id = r.id
