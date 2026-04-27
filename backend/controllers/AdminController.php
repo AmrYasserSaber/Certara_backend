@@ -327,16 +327,13 @@ final class AdminController extends Controller
 
         // Create Payment record
         $merchantRefNum = 'CERTARA-1-' . $id . '-' . time();
-        $payLink = \App\Services\FawryService::generatePaymentLink([
-            'merchantRefNum'    => $merchantRefNum,
-            'customerMobile'    => $research['student_phone'] ?? '01000000000',
-            'customerEmail'     => $research['student_email'] ?? 'student@example.com',
-            'customerName'      => $research['student_name'] ?? 'Student',
-            'customerProfileId' => (string) $research['student_id'],
-            'amount'            => $amount,
-            'itemId'            => 'first',
-            'description'       => "Research First Payment - {$serial}",
-            'returnUrl'         => env('APP_URL') . "/research/{$id}",
+        $payLink = \App\Services\KashierService::generatePaymentLink([
+            'amount'       => $amount,
+            'reference_id' => $merchantRefNum,
+            'email'        => $user->email ?? 'student@example.com',
+            'phone_number' => $user->phone ?? '01000000000',
+            'full_name'    => $user->name ?? 'Student ' . $id,
+            'description'  => "First Payment - {$serial}",
         ]);
 
         if (!$payLink) {
@@ -352,7 +349,7 @@ final class AdminController extends Controller
             Database::execute(
                 'INSERT INTO payments (research_id, amount, currency, type, status, gateway, gateway_ref, checkout_url, created_at, updated_at) 
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
-                [$id, $amount, 'EGP', 'first', 'pending', 'fawry', $merchantRefNum, $payLink]
+                [$id, $amount, 'EGP', 'first', 'pending', 'paymob', $merchantRefNum, $payLink]
             );
         });
 
@@ -397,16 +394,13 @@ final class AdminController extends Controller
 
         // Create Payment record
         $merchantRefNum = 'CERTARA-2-' . $id . '-' . time();
-        $payLink = \App\Services\FawryService::generatePaymentLink([
-            'merchantRefNum'    => $merchantRefNum,
-            'customerMobile'    => $research['student_phone'] ?? '01000000000',
-            'customerEmail'     => $research['student_email'] ?? 'student@example.com',
-            'customerName'      => $research['student_name'] ?? 'Student',
-            'customerProfileId' => (string) $research['student_id'],
-            'amount'            => $amount,
-            'itemId'            => 'second',
-            'description'       => "Research Second Payment - {$research['serial_number']}",
-            'returnUrl'         => env('APP_URL') . "/research/{$id}",
+        $payLink = \App\Services\KashierService::generatePaymentLink([
+            'amount'       => $amount,
+            'reference_id' => $merchantRefNum,
+            'email'        => $user->email ?? 'student@example.com',
+            'phone_number' => $user->phone ?? '01000000000',
+            'full_name'    => $user->name ?? 'Student ' . $id,
+            'description'  => "Second Payment - {$research['serial_number']}",
         ]);
 
         if (!$payLink) {
@@ -417,7 +411,7 @@ final class AdminController extends Controller
             Database::execute(
                 'INSERT INTO payments (research_id, amount, currency, type, status, gateway, gateway_ref, checkout_url, created_at, updated_at) 
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
-                [$id, $amount, 'EGP', 'second', 'pending', 'fawry', $merchantRefNum, $payLink]
+                [$id, $amount, 'EGP', 'second', 'pending', 'paymob', $merchantRefNum, $payLink]
             );
         });
 

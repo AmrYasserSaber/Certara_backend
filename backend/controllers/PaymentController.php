@@ -52,21 +52,18 @@ final class PaymentController extends Controller
             'currency'    => 'EGP',
             'type'        => $type,
             'status'      => PaymentStatus::PENDING,
-            'gateway'     => 'fawry',
+            'gateway'     => 'paymob',
         ]);
 
         $merchantRefNum = 'CERTARA-' . $payment->id . '-' . time();
         
-        $payLink = \App\Services\FawryService::generatePaymentLink([
-            'merchantRefNum'    => $merchantRefNum,
-            'customerMobile'    => $research->student->phone ?? '01000000000',
-            'customerEmail'     => $research->student->email ?? 'student@example.com',
-            'customerName'      => $research->student->name ?? 'Student ' . $research->student_id,
-            'customerProfileId' => (string) $research->student_id,
-            'amount'            => $amount,
-            'itemId'            => $type,
-            'description'       => "Research Payment - {$type} - {$research->serial_number}",
-            'returnUrl'         => env('APP_URL') . "/research/{$researchId}",
+        $payLink = \App\Services\KashierService::generatePaymentLink([
+            'amount'       => $amount,
+            'reference_id' => $merchantRefNum,
+            'email'        => $research->student->email ?? 'student@example.com',
+            'phone_number' => $research->student->phone ?? '01000000000',
+            'full_name'    => $research->student->name ?? 'Student ' . $research->student_id,
+            'description'  => "Research Payment - {$type} - {$research->serial_number}",
         ]);
 
         if (!$payLink) {
@@ -89,15 +86,16 @@ final class PaymentController extends Controller
 
     public function callback(Request $request): never
     {
-        $data = $request->all();
-        Logger::info('Fawry Callback Received', ['data' => $data]);
+        $data = $request->input(); // JSON body
+        $hmac = $request->query('hmac');
+        Logger::info('Paymob Callback Received', ['data' => $data, 'hmac' => $hmac]);
 
-        if (!\App\Services\FawryService::verifyCallback($data)) {
-            Logger::error('Fawry Callback Signature Mismatch', ['data' => $data]);
+        if (!\App\Services\KashierService::verifyCallback($data, $hmac === null ? null : (string)$hmac)) {
+            Logger::error('Paymob Callback Signature Mismatch');
             $this->fail('Invalid signature', 400, 'auth_error');
         }
 
-        $merchantRefNum = (string) ($data['merchantRefNum'] ?? '');
+        $merchantRefNum = (string) ($data['obj']['order']['merchant_order_id'] ?? '');
         $payment = Payment::where('gateway_ref', $merchantRefNum)->first();
 
         if (!$payment) {
@@ -109,9 +107,10 @@ final class PaymentController extends Controller
             $this->ok(['status' => 'already_processed']);
         }
 
-        $orderStatus = (string) ($data['orderStatus'] ?? '');
+        $success = filter_var($data['obj']['success'] ?? false, FILTER_VALIDATE_BOOL);
+        $pending = filter_var($data['obj']['pending'] ?? false, FILTER_VALIDATE_BOOL);
         
-        if ($orderStatus === 'PAID') {
+        if ($success) {
             $payment->update([
                 'status'  => PaymentStatus::PAID,
                 'paid_at' => now(),
@@ -133,13 +132,14 @@ final class PaymentController extends Controller
             );
             
             Logger::info('Payment confirmed via callback', ['payment_id' => $payment->id, 'research_id' => $research->id]);
-        } elseif (in_array($orderStatus, ['CANCELED', 'FAILED', 'EXPIRED'], true)) {
+        } elseif (!$pending) {
             $payment->update(['status' => PaymentStatus::FAILED]);
-            Logger::warning('Payment failed via callback', ['payment_id' => $payment->id, 'status' => $orderStatus]);
+            Logger::warning('Payment failed via callback', ['payment_id' => $payment->id]);
         }
 
         $this->ok(['status' => 'processed']);
     }
+
 
     public function receipt(Request $request): never
     {
