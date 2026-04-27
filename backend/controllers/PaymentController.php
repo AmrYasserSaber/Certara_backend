@@ -86,20 +86,19 @@ final class PaymentController extends Controller
 
     public function callback(Request $request): never
     {
-        $data = $request->input(); // JSON body
-        $hmac = $request->query('hmac');
-        Logger::info('Paymob Callback Received', ['data' => $data, 'hmac' => $hmac]);
+        $data = $request->all(); // Combines query and body
+        Logger::info('Kashier Callback Received', ['data' => $data]);
 
-        if (!\App\Services\KashierService::verifyCallback($data, $hmac === null ? null : (string)$hmac)) {
-            Logger::error('Paymob Callback Signature Mismatch');
+        if (!\App\Services\KashierService::verifyCallback($data)) {
+            Logger::error('Kashier Callback Signature Mismatch');
             $this->fail('Invalid signature', 400, 'auth_error');
         }
 
-        $merchantRefNum = (string) ($data['obj']['order']['merchant_order_id'] ?? '');
-        $payment = Payment::where('gateway_ref', $merchantRefNum)->first();
+        $orderId = (string) ($data['orderId'] ?? '');
+        $payment = Payment::where('gateway_ref', $orderId)->first();
 
         if (!$payment) {
-            Logger::error('Payment record not found for callback', ['merchantRefNum' => $merchantRefNum]);
+            Logger::error('Payment record not found for callback', ['orderId' => $orderId]);
             $this->fail('Payment not found', 404, 'not_found');
         }
 
@@ -107,10 +106,9 @@ final class PaymentController extends Controller
             $this->ok(['status' => 'already_processed']);
         }
 
-        $success = filter_var($data['obj']['success'] ?? false, FILTER_VALIDATE_BOOL);
-        $pending = filter_var($data['obj']['pending'] ?? false, FILTER_VALIDATE_BOOL);
+        $paymentStatus = (string) ($data['paymentStatus'] ?? $data['orderStatus'] ?? '');
         
-        if ($success) {
+        if (strtoupper($paymentStatus) === 'SUCCESS') {
             $payment->update([
                 'status'  => PaymentStatus::PAID,
                 'paid_at' => now(),
@@ -132,9 +130,9 @@ final class PaymentController extends Controller
             );
             
             Logger::info('Payment confirmed via callback', ['payment_id' => $payment->id, 'research_id' => $research->id]);
-        } elseif (!$pending) {
+        } else {
             $payment->update(['status' => PaymentStatus::FAILED]);
-            Logger::warning('Payment failed via callback', ['payment_id' => $payment->id]);
+            Logger::warning('Payment failed via callback', ['payment_id' => $payment->id, 'status' => $paymentStatus]);
         }
 
         $this->ok(['status' => 'processed']);

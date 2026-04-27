@@ -38,4 +38,9 @@ final class Research extends Model
     {
         return $this->hasMany(Document::class, 'research_id');
     }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class, 'research_id');
+    }
 }
