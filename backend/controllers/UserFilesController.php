@@ -94,7 +94,7 @@ final class UserFilesController extends Controller
 
         $side = (string) $data['type'];
         if (!in_array($side, IdentityPhotoType::ALL, true)) {
-            $this->fail('Invalid identity photo type.', 422, 'invalid_identity_photo_type');
+            $this->fail('نوع صورة الهوية غير صالح.', 422, 'invalid_identity_photo_type');
         }
 
         $service = $this->buildFileUploadService();
@@ -153,7 +153,7 @@ final class UserFilesController extends Controller
         $user = $this->requireUser($request);
         $type = (string) $request->query('type', '');
         if (!in_array($type, IdentityPhotoType::ALL, true)) {
-            $this->fail('Invalid identity photo type.', 422, 'invalid_identity_photo_type');
+            $this->fail('نوع صورة الهوية غير صالح.', 422, 'invalid_identity_photo_type');
         }
 
         /** @var UserIdentityPhoto|null $activePhoto */
@@ -167,7 +167,7 @@ final class UserFilesController extends Controller
         $filePath = $activePhoto === null ? '' : (string) ($activePhoto->file_path ?? '');
 
         if ($filePath === '') {
-            $this->fail('Identity photo not found.', 404, 'not_found');
+            $this->fail('صورة الهوية غير موجودة.', 404, 'not_found');
         }
 
         $expireSeconds = (int) env('IMAGEKIT_SIGNED_URL_EXPIRE_SECONDS', 300);
@@ -175,7 +175,7 @@ final class UserFilesController extends Controller
         try {
             $signedUrl = $client->buildSignedUrl($filePath, $expireSeconds);
         } catch (\InvalidArgumentException $err) {
-            $this->fail('Could not generate signed URL.', 500, 'signed_url_failed', [
+            $this->fail('تعذر إنشاء رابط موقع.', 500, 'signed_url_failed', [
                 'reason' => $err->getMessage(),
             ]);
         }
@@ -188,7 +188,7 @@ final class UserFilesController extends Controller
     private function requireUser(Request $request): User {
         $user = $request->user();
         if (!$user instanceof User) {
-            $this->fail('Unauthenticated.', 401, 'unauthenticated');
+            $this->fail('غير مصرح بالدخول.', 401, 'unauthenticated');
         }
         return $user;
     }

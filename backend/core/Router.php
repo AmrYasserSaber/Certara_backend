@@ -87,7 +87,7 @@ final class Router
         $path   = $request->path();
 
         if (!isset($this->routes[$method])) {
-            Response::error('Method not allowed.', 405, 'method_not_allowed');
+            Response::error('الطريقة غير مسموح بها.', 405, 'method_not_allowed');
         }
 
         foreach ($this->routes[$method] as $route) {
@@ -112,7 +112,7 @@ final class Router
             }
         }
 
-        Response::error('Route not found.', 404, 'not_found');
+        Response::error('المسار غير موجود.', 404, 'not_found');
     }
 
     private function compilePattern(string $pattern): array
@@ -143,7 +143,7 @@ final class Router
                 'path' => $request->path(),
                 'method' => $request->method(),
             ]);
-            Response::error('Invalid route handler.', 500, 'server_error');
+            Response::error('معالج المسار غير صالح.', 500, 'server_error');
         }
 
         if ($result !== null) {
