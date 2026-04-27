@@ -10,6 +10,7 @@ use App\Core\Request;
 use App\Enums\NotificationType;
 use App\Helpers\NotificationService;
 use App\Models\User;
+use App\Services\PaymobService;
 
 final class AdminController extends Controller
 {
@@ -324,34 +325,69 @@ final class AdminController extends Controller
         $countRow = Database::fetchOne('SELECT COUNT(*) AS total FROM research WHERE serial_number LIKE ?', [$prefix . '%']);
         $next = ((int) ($countRow['total'] ?? 0)) + 1;
         $serial = $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
-
-        // Create Payment record
-        $merchantRefNum = 'CERTARA-1-' . $id . '-' . time();
-        $payLink = \App\Services\KashierService::generatePaymentLink([
-            'amount'       => $amount,
-            'reference_id' => $merchantRefNum,
-            'email'        => $user->email ?? 'student@example.com',
-            'phone_number' => $user->phone ?? '01000000000',
-            'full_name'    => $user->name ?? 'Student ' . $id,
-            'description'  => "First Payment - {$serial}",
-        ]);
-
-        if (!$payLink) {
-            $this->fail('فشل إنشاء رابط الدفع. يرجى المحاولة لاحقاً', 500, 'gateway_error');
+        $student = Database::fetchOne(
+            'SELECT u.id, u.name, u.email, u.phone FROM research r JOIN users u ON u.id = r.student_id WHERE r.id = ? LIMIT 1',
+            [$id]
+        );
+        if ($student === null) {
+            $this->fail('Student not found.', 404, 'not_found');
         }
 
-        Database::transaction(function () use ($id, $serial, $amount, $merchantRefNum, $payLink): void {
+        $payLink = null;
+        $paymentId = 0;
+
+        Database::transaction(function () use ($id, $serial, $amount, &$paymentId): void {
             Database::execute(
                 'UPDATE research SET serial_number = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
                 [$serial, 'awaiting_payment_1', $id]
             );
 
-            Database::execute(
-                'INSERT INTO payments (research_id, amount, currency, type, status, gateway, gateway_ref, checkout_url, created_at, updated_at) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
-                [$id, $amount, 'EGP', 'first', 'pending', 'paymob', $merchantRefNum, $payLink]
-            );
+            $paymentId = (int) Database::connection()->table('payments')->insertGetId([
+                'research_id' => $id,
+                'amount' => $amount,
+                'currency' => 'EGP',
+                'type' => 'first',
+                'status' => 'pending',
+                'gateway' => 'paymob',
+                'gateway_ref' => null,
+                'checkout_url' => null,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
         });
+
+        if ($paymentId <= 0) {
+            $this->fail('Failed to create payment record.', 500, 'server_error');
+        }
+
+        $merchantRefNum = PaymobService::buildMerchantReference($paymentId);
+        try {
+            $payLink = PaymobService::createQuickLink([
+                'amount' => $amount,
+                'currency' => 'EGP',
+                'merchant_reference' => $merchantRefNum,
+                'description' => "First Payment - {$serial}",
+                'customer' => [
+                    'email' => (string) ($student['email'] ?? 'student@example.com'),
+                    'first_name' => (string) ($student['name'] ?? 'Student'),
+                    'last_name' => 'N/A',
+                    'phone_number' => (string) ($student['phone'] ?? '01000000000'),
+                    'country' => 'EG',
+                    'city' => 'NA',
+                    'state' => 'NA',
+                    'street' => 'NA',
+                    'postal_code' => 'NA',
+                ],
+            ]);
+        } catch (\Throwable $err) {
+            Logger::error('Paymob link generation failed', ['error_message' => $err->getMessage()]);
+            $this->fail('فشل إنشاء رابط الدفع. يرجى المحاولة لاحقاً', 500, 'gateway_error');
+        }
+
+        Database::execute(
+            'UPDATE payments SET gateway_ref = ?, checkout_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [$merchantRefNum, $payLink, $paymentId]
+        );
 
         $this->logActivity(
             actorId: $actor?->id !== null ? (int) $actor->id : null,
@@ -392,28 +428,67 @@ final class AdminController extends Controller
             $this->fail('Second payment can only be set when research is awaiting it.', 409, 'invalid_state');
         }
 
-        // Create Payment record
-        $merchantRefNum = 'CERTARA-2-' . $id . '-' . time();
-        $payLink = \App\Services\KashierService::generatePaymentLink([
-            'amount'       => $amount,
-            'reference_id' => $merchantRefNum,
-            'email'        => $user->email ?? 'student@example.com',
-            'phone_number' => $user->phone ?? '01000000000',
-            'full_name'    => $user->name ?? 'Student ' . $id,
-            'description'  => "Second Payment - {$research['serial_number']}",
+        $isFirstPaid = Database::fetchOne(
+            'SELECT id FROM payments WHERE research_id = ? AND type = ? AND status = ? ORDER BY id DESC LIMIT 1',
+            [$id, 'first', 'paid']
+        );
+        if ($isFirstPaid === null) {
+            $this->fail('First payment must be completed before setting the second payment.', 409, 'invalid_state');
+        }
+
+        $student = Database::fetchOne(
+            'SELECT u.id, u.name, u.email, u.phone FROM research r JOIN users u ON u.id = r.student_id WHERE r.id = ? LIMIT 1',
+            [$id]
+        );
+        if ($student === null) {
+            $this->fail('Student not found.', 404, 'not_found');
+        }
+
+        $paymentId = (int) Database::connection()->table('payments')->insertGetId([
+            'research_id' => $id,
+            'amount' => $amount,
+            'currency' => 'EGP',
+            'type' => 'second',
+            'status' => 'pending',
+            'gateway' => 'paymob',
+            'gateway_ref' => null,
+            'checkout_url' => null,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
         ]);
 
-        if (!$payLink) {
+        if ($paymentId <= 0) {
+            $this->fail('Failed to create payment record.', 500, 'server_error');
+        }
+
+        $merchantRefNum = PaymobService::buildMerchantReference($paymentId);
+        try {
+            $payLink = PaymobService::createQuickLink([
+                'amount' => $amount,
+                'currency' => 'EGP',
+                'merchant_reference' => $merchantRefNum,
+                'description' => 'Second Payment - ' . (string) ($research['serial_number'] ?? ''),
+                'customer' => [
+                    'email' => (string) ($student['email'] ?? 'student@example.com'),
+                    'first_name' => (string) ($student['name'] ?? 'Student'),
+                    'last_name' => 'N/A',
+                    'phone_number' => (string) ($student['phone'] ?? '01000000000'),
+                    'country' => 'EG',
+                    'city' => 'NA',
+                    'state' => 'NA',
+                    'street' => 'NA',
+                    'postal_code' => 'NA',
+                ],
+            ]);
+        } catch (\Throwable $err) {
+            Logger::error('Paymob link generation failed', ['error_message' => $err->getMessage()]);
             $this->fail('فشل إنشاء رابط الدفع. يرجى المحاولة لاحقاً', 500, 'gateway_error');
         }
 
-        Database::transaction(function () use ($id, $amount, $merchantRefNum, $payLink): void {
-            Database::execute(
-                'INSERT INTO payments (research_id, amount, currency, type, status, gateway, gateway_ref, checkout_url, created_at, updated_at) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
-                [$id, $amount, 'EGP', 'second', 'pending', 'paymob', $merchantRefNum, $payLink]
-            );
-        });
+        Database::execute(
+            'UPDATE payments SET gateway_ref = ?, checkout_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [$merchantRefNum, $payLink, $paymentId]
+        );
 
         $this->logActivity(
             actorId: $actor?->id !== null ? (int) $actor->id : null,

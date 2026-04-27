@@ -18,6 +18,7 @@ final class CsrfMiddleware implements Middleware
         '/api/health',
         '/api/auth/login',
         '/api/auth/register',
+        '/api/payment/callback',
     ];
 
     public function handle(Request $request): Request

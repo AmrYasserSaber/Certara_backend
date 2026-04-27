@@ -33,6 +33,7 @@ $router->get('/api/admin/research', [AdminController::class, 'researchList'], $a
 $router->get('/api/admin/research/{id}', [AdminController::class, 'researchDetail'], $adminMiddleware);
 $router->put('/api/admin/research/{id}/assign-reviewer', [AdminController::class, 'assignReviewer'], $adminMiddleware);
 $router->post('/api/admin/research/{id}/serial', [AdminController::class, 'generateSerial'], $adminMiddleware);
+$router->post('/api/admin/research/{id}/second-payment', [AdminController::class, 'setSecondPayment'], $adminMiddleware);
 $router->get('/api/admin/logs', [AdminController::class, 'logs'], $adminMiddleware);
 $router->get('/api/admin/reviewers', [AdminController::class, 'reviewers'], $adminMiddleware);
 

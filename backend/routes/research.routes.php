@@ -19,7 +19,7 @@ $router->patch('/api/research/{id}',  [ResearchController::class, 'update'], [Au
 // Payment routes
 $router->post('/api/research/{id}/payment',         [PaymentController::class, 'store'],  [AuthMiddleware::class]);
 $router->get('/api/research/{id}/payment/receipt',  [PaymentController::class, 'receipt'], [AuthMiddleware::class]);
-$router->post('/api/research/payment/{payment_id}/success', [PaymentController::class, 'finalize'], [AuthMiddleware::class]);
+$router->get('/api/payment/callback',               [PaymentController::class, 'responseCallback']); // Public redirect callback (UX)
 $router->post('/api/payment/callback',              [PaymentController::class, 'callback']); // Public callback
 
 // Document routes

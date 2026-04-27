@@ -41,7 +41,7 @@ final class DocumentController extends Controller
         // Normalize files array and use keys as types if they are provided as documents[type]
         $normalizedFiles = $this->normalizeFiles($files);
 
-        foreach ($normalizedFiles as $file) {
+        foreach ($normalizedFiles as $index => $file) {
             $fileType = $file['key'] ?? $type; // Use the key from FormData if available
             $error = UploadHelper::validatePDF($file);
             if ($error) {

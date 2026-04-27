@@ -10,25 +10,34 @@ final class UploadHelper
 
     public static function saveFile(array $file, string $directory): string
     {
-        if (!is_dir($directory)) {
-            mkdir($directory, 0755, true);
+        $absoluteDirectory = self::resolvePath($directory);
+        if (!is_dir($absoluteDirectory)) {
+            $didCreateDirectory = mkdir($absoluteDirectory, 0755, true);
+            if ($didCreateDirectory === false) {
+                throw new \RuntimeException("Failed to create upload directory: {$directory}");
+            }
+        }
+        if (!is_writable($absoluteDirectory)) {
+            throw new \RuntimeException("Upload directory is not writable: {$directory}");
         }
 
         $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
         $filename = uniqid('doc_', true) . '.' . $extension;
-        $path = rtrim($directory, '/') . '/' . $filename;
+        $relativePath = rtrim($directory, '/') . '/' . $filename;
+        $absolutePath = self::resolvePath($relativePath);
 
-        if (!move_uploaded_file($file['tmp_name'], $path)) {
-            throw new \RuntimeException('Failed to move uploaded file.');
+        if (!move_uploaded_file($file['tmp_name'], $absolutePath)) {
+            throw new \RuntimeException("Failed to move uploaded file to: {$relativePath}");
         }
 
-        return $path;
+        return $relativePath;
     }
 
     public static function deleteFile(string $path): bool
     {
-        if (file_exists($path)) {
-            return unlink($path);
+        $absolutePath = self::resolvePath($path);
+        if (file_exists($absolutePath)) {
+            return unlink($absolutePath);
         }
         return false;
     }
@@ -51,5 +60,14 @@ final class UploadHelper
         }
 
         return null;
+    }
+
+    private static function resolvePath(string $path): string
+    {
+        if (str_starts_with($path, '/')) {
+            return $path;
+        }
+        $backendRootPath = dirname(__DIR__);
+        return rtrim($backendRootPath, '/') . '/' . ltrim($path, '/');
     }
 }
