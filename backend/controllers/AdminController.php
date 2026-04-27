@@ -294,6 +294,10 @@ final class AdminController extends Controller
     {
         $actor = $request->user();
         $id = (int) $request->param('id');
+        $data = $this->validate($request, [
+            'amount' => 'required|numeric|min:0.01',
+        ]);
+        $amount = (float) $data['amount'];
 
         if ($id <= 0) {
             $this->fail('Invalid research id.', 422, 'validation_error');
@@ -321,17 +325,43 @@ final class AdminController extends Controller
         $next = ((int) ($countRow['total'] ?? 0)) + 1;
         $serial = $prefix . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
 
-        Database::execute(
-            'UPDATE research SET serial_number = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            [$serial, 'awaiting_payment_1', $id]
-        );
+        // Create Payment record
+        $merchantRefNum = 'CERTARA-1-' . $id . '-' . time();
+        $payLink = \App\Services\FawryService::generatePaymentLink([
+            'merchantRefNum'    => $merchantRefNum,
+            'customerMobile'    => $research['student_phone'] ?? '01000000000',
+            'customerEmail'     => $research['student_email'] ?? 'student@example.com',
+            'customerName'      => $research['student_name'] ?? 'Student',
+            'customerProfileId' => (string) $research['student_id'],
+            'amount'            => $amount,
+            'itemId'            => 'first',
+            'description'       => "Research First Payment - {$serial}",
+            'returnUrl'         => env('APP_URL') . "/research/{$id}",
+        ]);
+
+        if (!$payLink) {
+            $this->fail('فشل إنشاء رابط الدفع. يرجى المحاولة لاحقاً', 500, 'gateway_error');
+        }
+
+        Database::transaction(function () use ($id, $serial, $amount, $merchantRefNum, $payLink): void {
+            Database::execute(
+                'UPDATE research SET serial_number = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [$serial, 'awaiting_payment_1', $id]
+            );
+
+            Database::execute(
+                'INSERT INTO payments (research_id, amount, currency, type, status, gateway, gateway_ref, checkout_url, created_at, updated_at) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
+                [$id, $amount, 'EGP', 'first', 'pending', 'fawry', $merchantRefNum, $payLink]
+            );
+        });
 
         $this->logActivity(
             actorId: $actor?->id !== null ? (int) $actor->id : null,
             action: 'admin.serial_generated',
             targetType: 'research',
             targetId: $id,
-            details: ['serial_number' => $serial, 'status' => 'awaiting_payment_1']
+            details: ['serial_number' => $serial, 'status' => 'awaiting_payment_1', 'amount' => $amount]
         );
 
         Logger::info('Admin generated research serial', [
@@ -343,6 +373,65 @@ final class AdminController extends Controller
         $this->ok([
             'research' => $this->loadResearchDetail($id),
             'serial_number' => $serial,
+            'checkout_url' => $payLink
+        ]);
+    }
+
+    public function setSecondPayment(Request $request): never
+    {
+        $actor = $request->user();
+        $id = (int) $request->param('id');
+        $data = $this->validate($request, [
+            'amount' => 'required|numeric|min:0.01',
+        ]);
+        $amount = (float) $data['amount'];
+
+        $research = Database::fetchOne('SELECT * FROM research WHERE id = ?', [$id]);
+        if ($research === null) {
+            $this->fail('Research not found.', 404, 'not_found');
+        }
+
+        if ((string) $research['status'] !== 'awaiting_payment_2') {
+            $this->fail('Second payment can only be set when research is awaiting it.', 409, 'invalid_state');
+        }
+
+        // Create Payment record
+        $merchantRefNum = 'CERTARA-2-' . $id . '-' . time();
+        $payLink = \App\Services\FawryService::generatePaymentLink([
+            'merchantRefNum'    => $merchantRefNum,
+            'customerMobile'    => $research['student_phone'] ?? '01000000000',
+            'customerEmail'     => $research['student_email'] ?? 'student@example.com',
+            'customerName'      => $research['student_name'] ?? 'Student',
+            'customerProfileId' => (string) $research['student_id'],
+            'amount'            => $amount,
+            'itemId'            => 'second',
+            'description'       => "Research Second Payment - {$research['serial_number']}",
+            'returnUrl'         => env('APP_URL') . "/research/{$id}",
+        ]);
+
+        if (!$payLink) {
+            $this->fail('فشل إنشاء رابط الدفع. يرجى المحاولة لاحقاً', 500, 'gateway_error');
+        }
+
+        Database::transaction(function () use ($id, $amount, $merchantRefNum, $payLink): void {
+            Database::execute(
+                'INSERT INTO payments (research_id, amount, currency, type, status, gateway, gateway_ref, checkout_url, created_at, updated_at) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
+                [$id, $amount, 'EGP', 'second', 'pending', 'fawry', $merchantRefNum, $payLink]
+            );
+        });
+
+        $this->logActivity(
+            actorId: $actor?->id !== null ? (int) $actor->id : null,
+            action: 'admin.second_payment_set',
+            targetType: 'research',
+            targetId: $id,
+            details: ['amount' => $amount]
+        );
+
+        $this->ok([
+            'research' => $this->loadResearchDetail($id),
+            'checkout_url' => $payLink
         ]);
     }
 
