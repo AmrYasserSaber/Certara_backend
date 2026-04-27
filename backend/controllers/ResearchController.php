@@ -50,7 +50,7 @@ final class ResearchController extends Controller
         $research = Research::with('documents')->where('student_id', $studentId)->find($id);
 
         if (!$research) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         $this->ok($research);
@@ -63,11 +63,11 @@ final class ResearchController extends Controller
         $research = Research::where('student_id', $studentId)->find($id);
 
         if (!$research) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         if (!in_array($research->status, [ResearchStatus::DRAFT, ResearchStatus::REVISION_REQUESTED], true)) {
-            $this->fail('Research can only be updated in DRAFT or REVISION_REQUESTED status.', 422, 'invalid_status');
+            $this->fail('يمكن تحديث البحث فقط في حالة مسودة أو طلب مراجعة.', 422, 'invalid_status');
         }
 
         $data = $this->validate($request, [

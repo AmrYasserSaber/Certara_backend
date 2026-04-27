@@ -24,7 +24,7 @@ final class CertificateController extends Controller
         $managerName = is_object($actor) ? (string) ($actor->name ?? 'IRB Manager') : 'IRB Manager';
 
         if ($researchId <= 0) {
-            $this->fail('Invalid research id.', 422, 'validation_error');
+            $this->fail('معرف البحث غير صالح.', 422, 'validation_error');
         }
 
         $research = $db->fetchOne(
@@ -33,11 +33,11 @@ final class CertificateController extends Controller
         );
 
         if ($research === null) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         if ((string) ($research['status'] ?? '') !== 'approved') {
-            $this->fail('Certificate can only be generated after final approval.', 409, 'invalid_state');
+            $this->fail('يمكن إصدار الشهادة فقط بعد الموافقة النهائية.', 409, 'invalid_state');
         }
 
         $existing = Certificate::findByResearchId($researchId);
@@ -65,7 +65,7 @@ final class CertificateController extends Controller
         ]);
 
         if ($certificate === null) {
-            $this->fail('Unable to save certificate.', 500, 'server_error');
+            $this->fail('تعذر حفظ الشهادة.', 500, 'server_error');
         }
 
         $this->logAction(
@@ -104,13 +104,13 @@ final class CertificateController extends Controller
         $actorId = is_object($actor) ? (int) ($actor->id ?? 0) : 0;
 
         if ($researchId <= 0) {
-            $this->fail('Invalid research id.', 422, 'validation_error');
+            $this->fail('معرف البحث غير صالح.', 422, 'validation_error');
         }
 
         $role = is_object($actor) ? (string) ($actor->role ?? '') : '';
         $allowed = in_array($role, ['student', 'admin', 'manager'], true);
         if (!$allowed) {
-            $this->fail('Forbidden.', 403, 'forbidden');
+            $this->fail('غير مسموح.', 403, 'forbidden');
         }
 
         $research = $db->fetchOne(
@@ -119,17 +119,17 @@ final class CertificateController extends Controller
         );
 
         if ($research === null) {
-            $this->fail('Certificate not found.', 404, 'not_found');
+            $this->fail('الشهادة غير موجودة.', 404, 'not_found');
         }
 
         if ($role === 'student' && (int) ($research['student_id'] ?? 0) !== (int) ($actor->id ?? 0)) {
-            $this->fail('Forbidden.', 403, 'forbidden');
+            $this->fail('غير مسموح.', 403, 'forbidden');
         }
 
         $relativePath = (string) ($research['file_path'] ?? '');
         $absolutePath = dirname(__DIR__) . '/' . ltrim($relativePath, '/');
         if ($relativePath === '' || !is_file($absolutePath)) {
-            $this->fail('Certificate file not found.', 404, 'not_found');
+            $this->fail('ملف الشهادة غير موجود.', 404, 'not_found');
         }
 
         $this->logAction(
@@ -150,7 +150,7 @@ final class CertificateController extends Controller
         ]);
 
         header('Content-Type: application/pdf');
-        header('Content-Disposition: attachment; filename="' . basename($absolutePath) . '"');
+        header('Content-Disposition: inline; filename="' . basename($absolutePath) . '"');
         header('Content-Length: ' . (string) filesize($absolutePath));
         readfile($absolutePath);
         exit;

@@ -32,6 +32,11 @@ final class ManagerController extends Controller
         $this->stats($request);
     }
 
+    public function getApprovedCertificates(Request $request): never
+    {
+        $this->approvedCertificates($request);
+    }
+
     public function reviewedQueue(Request $request): never
     {
         $page  = max(1, (int) $request->query('page', 1));
@@ -51,16 +56,35 @@ final class ManagerController extends Controller
         $this->ok(['items' => $result['items']], $result['meta']);
     }
 
+    public function approvedCertificates(Request $request): never
+    {
+        $page  = max(1, (int) $request->query('page', 1));
+        $limit = min(50, max(1, (int) $request->query('limit', 20)));
+        $search = trim((string) $request->query('q', ''));
+
+        $where = ['r.status = ?'];
+        $bindings = ['approved'];
+
+        if ($search !== '') {
+            $where[] = '(r.title LIKE ? OR r.serial_number LIKE ? OR u.name LIKE ? OR u.email LIKE ?)';
+            $like = '%' . $search . '%';
+            array_push($bindings, $like, $like, $like, $like);
+        }
+
+        $result = $this->paginateResearch($where, $bindings, $page, $limit, 'r.updated_at DESC, r.id DESC');
+        $this->ok(['items' => $result['items']], $result['meta']);
+    }
+
     public function researchDetail(Request $request): never
     {
         $id = (int) $request->param('id');
         if ($id <= 0) {
-            $this->fail('Invalid research id.', 422, 'validation_error');
+            $this->fail('معرف البحث غير صالح.', 422, 'validation_error');
         }
 
         $research = $this->loadResearchDetail($id);
         if ($research === null) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         $this->ok(['research' => $research]);
@@ -85,16 +109,16 @@ final class ManagerController extends Controller
         };
 
         if ($id <= 0 || $decision === null) {
-            $this->fail('Invalid decision payload.', 422, 'validation_error');
+            $this->fail('بيانات القرار غير صالحة.', 422, 'validation_error');
         }
 
         $current = Database::fetchOne('SELECT id, student_id, status FROM research WHERE id = ?', [$id]);
         if ($current === null) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         if (!in_array((string) $current['status'], ['reviewer_approved', 'manager_reviewing'], true)) {
-            $this->fail('Research is not ready for final decision.', 409, 'invalid_state');
+            $this->fail('البحث غير جاهز لاتخاذ قرار نهائي.', 409, 'invalid_state');
         }
 
         Database::transaction(function () use ($id, $decision): void {
@@ -166,16 +190,16 @@ final class ManagerController extends Controller
         $id = (int) $request->param('id');
 
         if ($id <= 0) {
-            $this->fail('Invalid research id.', 422, 'validation_error');
+            $this->fail('معرف البحث غير صالح.', 422, 'validation_error');
         }
 
         $research = $this->loadResearchDetail($id);
         if ($research === null) {
-            $this->fail('Research not found.', 404, 'not_found');
+            $this->fail('البحث غير موجود.', 404, 'not_found');
         }
 
         if ((string) ($research['status'] ?? '') !== 'approved') {
-            $this->fail('Certificate can only be issued after final approval.', 409, 'invalid_state');
+            $this->fail('يمكن إصدار الشهادة فقط بعد الموافقة النهائية.', 409, 'invalid_state');
         }
 
         $existing = Database::fetchOne('SELECT * FROM certificates WHERE research_id = ? LIMIT 1', [$id]);
@@ -194,7 +218,7 @@ final class ManagerController extends Controller
         $issuedBy = (int) ($actor?->id ?? 0);
 
         if ($issuedBy <= 0) {
-            $this->fail('Unauthenticated.', 401, 'unauthenticated');
+            $this->fail('غير مصرح بالدخول.', 401, 'unauthenticated');
         }
 
         Database::transaction(function () use ($id, $issuedBy, $certificateNumber, $filePath): void {

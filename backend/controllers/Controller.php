@@ -37,7 +37,7 @@ abstract class Controller
                 'method' => $request->method(),
                 'errors' => $result['errors'],
             ]);
-            $this->fail('Validation failed.', 422, 'validation_error', $result['errors']);
+            $this->fail('فشل التحقق.', 422, 'validation_error', $result['errors']);
         }
 
         return $result['data'];
